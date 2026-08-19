@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>성격 나침반 / 性格コンパス</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --forest: #132a22;
+        --forest-deep: #0b1d16;
+        --cream: #f3efe3;
+        --cream-dim: #cfc9b8;
+        --brass: #d4a94c;
+        --brass-soft: #e8c87a;
+        --coral: #c8694f;
+        --line: rgba(243, 239, 227, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background:
+          radial-gradient(1200px 600px at 15% -10%, rgba(212, 169, 76, 0.1), transparent 60%),
+          radial-gradient(900px 500px at 110% 10%, rgba(200, 105, 79, 0.08), transparent 55%), var(--forest);
+        color: var(--cream);
+        font-family: "IBM Plex Sans KR", "Noto Sans JP", sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 16px;
+      }
+      .stage {
+        width: 100%;
+        max-width: 640px;
+      }
+
+      .lang-switch {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .lang-btn {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        background: transparent;
+        color: var(--cream-dim);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 14px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .lang-btn.active {
+        background: var(--brass);
+        color: var(--forest-deep);
+        border-color: var(--brass);
+        font-weight: 600;
+      }
+      .lang-btn:hover:not(.active) {
+        border-color: var(--brass);
+        color: var(--cream);
+      }
+
+      .eyebrow {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        color: var(--brass-soft);
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 18px;
+        height: 1px;
+        background: var(--brass);
+        display: inline-block;
+      }
+      h1 {
+        font-family: "Fraunces", serif;
+        font-weight: 600;
+        font-size: 34px;
+        line-height: 1.15;
+        margin: 0 0 14px 0;
+        letter-spacing: -0.01em;
+      }
+      p.lead {
+        color: var(--cream-dim);
+        font-size: 15px;
+        line-height: 1.7;
+        margin: 0 0 26px 0;
+      }
+      .card {
+        background: linear-gradient(180deg, rgba(243, 239, 227, 0.05), rgba(243, 239, 227, 0.02));
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 34px;
+        backdrop-filter: blur(2px);
+      }
+      .compass {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 22px;
+      }
+      .btn {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        background: var(--brass);
+        color: var(--forest-deep);
+        border: none;
+        border-radius: 999px;
+        padding: 14px 28px;
+        cursor: pointer;
+        font-weight: 600;
+        transition:
+          transform 0.15s ease,
+          background 0.15s ease;
+      }
+      .btn:hover {
+        background: var(--brass-soft);
+        transform: translateY(-1px);
+      }
+      .btn:active {
+        transform: translateY(0);
+      }
+      .btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--cream);
+        border: 1px solid var(--line);
+      }
+      .btn.ghost:hover {
+        background: rgba(243, 239, 227, 0.06);
+      }
+      .btn-row {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 28px;
+      }
+
+      .progress-wrap {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 26px;
+      }
+      .progress-seg {
+        flex: 1;
+        height: 4px;
+        border-radius: 4px;
+        background: rgba(243, 239, 227, 0.12);
+        overflow: hidden;
+      }
+      .progress-seg > i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: var(--brass);
+        transition: width 0.35s ease;
+      }
+      .progress-meta {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        color: var(--cream-dim);
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .q-trait-tag {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: var(--brass-soft);
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .q-text {
+        font-family: "Fraunces", serif;
+        font-size: 23px;
+        line-height: 1.45;
+        margin: 0 0 26px 0;
+        min-height: 100px;
+      }
+      .scale {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .scale-btn {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 13px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(243, 239, 227, 0.02);
+        cursor: pointer;
+        color: var(--cream);
+        font-size: 14.5px;
+        text-align: left;
+        transition: all 0.15s ease;
+      }
+      .scale-btn .dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1.5px solid var(--cream-dim);
+        flex-shrink: 0;
+      }
+      .scale-btn:hover {
+        border-color: var(--brass);
+        background: rgba(212, 169, 76, 0.06);
+      }
+      .scale-btn.selected {
+        border-color: var(--brass);
+        background: rgba(212, 169, 76, 0.14);
+      }
+      .scale-btn.selected .dot {
+        border-color: var(--brass);
+        background: var(--brass);
+      }
+
+      .result-title {
+        font-family: "Fraunces", serif;
+        font-weight: 600;
+        font-size: 25px;
+        text-align: center;
+        margin: 4px 0 6px 0;
+        color: var(--brass-soft);
+      }
+      .result-sub {
+        text-align: center;
+        color: var(--cream-dim);
+        font-size: 13px;
+        margin-bottom: 28px;
+        font-family: "IBM Plex Mono", monospace;
+        letter-spacing: 0.04em;
+      }
+      .trait-block {
+        margin-bottom: 24px;
+      }
+      .trait-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+      }
+      .trait-head .name {
+        font-size: 15px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .trait-head .pct {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        color: var(--brass-soft);
+      }
+      .trait-bar {
+        height: 8px;
+        border-radius: 8px;
+        background: rgba(243, 239, 227, 0.1);
+        overflow: hidden;
+        margin-bottom: 8px;
+      }
+      .trait-bar > div {
+        height: 100%;
+        background: linear-gradient(90deg, var(--brass), var(--coral));
+      }
+      .trait-desc {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--cream-dim);
+      }
+
+      .disclaimer {
+        font-size: 12px;
+        color: var(--cream-dim);
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+        margin-top: 24px;
+        line-height: 1.6;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 27px;
+        }
+        .card {
+          padding: 24px;
+        }
+        .q-text {
+          font-size: 19px;
+          min-height: 80px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="lang-switch">
+        <button class="lang-btn" id="lang-ko" onclick="setLang('ko')">한국어</button>
+        <button class="lang-btn" id="lang-ja" onclick="setLang('ja')">日本語</button>
+      </div>
+
+      <!-- INTRO -->
+      <div id="screen-intro">
+        <div class="eyebrow" id="t-eyebrow-intro"></div>
+        <h1 id="t-title"></h1>
+        <p class="lead" id="t-lead"></p>
+        <div class="card">
+          <div class="compass">
+            <svg viewBox="0 0 120 120" width="120" height="120" fill="none">
+              <circle cx="60" cy="60" r="56" stroke="#D4A94C" stroke-opacity="0.35" stroke-width="1" />
+              <circle cx="60" cy="60" r="38" stroke="#D4A94C" stroke-opacity="0.5" stroke-width="1" />
+              <line x1="60" y1="6" x2="60" y2="114" stroke="#D4A94C" stroke-opacity="0.3" stroke-width="1" />
+              <line x1="6" y1="60" x2="114" y2="60" stroke="#D4A94C" stroke-opacity="0.3" stroke-width="1" />
+              <polygon points="60,20 66,60 60,100 54,60" fill="#D4A94C" />
+              <circle cx="60" cy="60" r="5" fill="#F3EFE3" />
+            </svg>
+          </div>
+          <div style="text-align: center">
+            <button class="btn" id="t-start-btn" onclick="startQuiz()"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUIZ -->
+      <div id="screen-quiz" class="hidden">
+        <div class="progress-meta">
+          <span id="q-counter">1 / 30</span>
+          <span id="q-trait-label"></span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-seg"><i id="prog-E"></i></div>
+          <div class="progress-seg"><i id="prog-A"></i></div>
+          <div class="progress-seg"><i id="prog-C"></i></div>
+          <div class="progress-seg"><i id="prog-N"></i></div>
+          <div class="progress-seg"><i id="prog-O"></i></div>
+        </div>
+        <div class="card">
+          <div class="q-trait-tag"><span id="q-icon">🎉</span><span id="q-trait-name"></span></div>
+          <div class="q-text" id="q-text"></div>
+          <div class="scale" id="scale"></div>
+          <div class="btn-row">
+            <button class="btn ghost" id="btn-prev" onclick="prevQuestion()"></button>
+            <button class="btn" id="btn-next" onclick="nextQuestion()" disabled></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div id="screen-result" class="hidden">
+        <div class="eyebrow" id="t-eyebrow-result"></div>
+        <div class="card">
+          <div class="compass">
+            <svg viewBox="0 0 120 120" width="100" height="100" fill="none">
+              <circle cx="60" cy="60" r="56" stroke="#D4A94C" stroke-opacity="0.35" stroke-width="1" />
+              <circle cx="60" cy="60" r="38" stroke="#D4A94C" stroke-opacity="0.5" stroke-width="1" />
+              <polygon points="60,20 66,60 60,100 54,60" fill="#D4A94C" />
+              <circle cx="60" cy="60" r="5" fill="#F3EFE3" />
+            </svg>
+          </div>
+          <div class="result-title" id="result-title"></div>
+          <div class="result-sub" id="result-sub"></div>
+
+          <div id="trait-blocks"></div>
+
+          <div style="text-align: center; margin-top: 10px">
+            <button class="btn ghost" id="t-restart-btn" onclick="restartQuiz()"></button>
+          </div>
+
+          <div class="disclaimer" id="t-disclaimer"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ---------- 다국어 텍스트 ----------
+      const i18n = {
+        ko: {
+          eyebrowIntro: "BIG FIVE SELF CHECK · 30문항",
+          title: "당신의 성격 나침반을<br>맞춰볼까요?",
+          lead: "외향성, 우호성, 성실성, 신경증, 개방성. 심리학에서 가장 널리 쓰이는 다섯 가지 성격 특성으로 나를 가늠해봅니다. 정답은 없으니 처음 떠오르는 느낌대로 골라주세요. 약 5분 정도 걸려요.",
+          startBtn: "시작하기",
+          prevBtn: "이전",
+          nextBtn: "다음",
+          resultBtn: "결과 보기",
+          restartBtn: "다시 하기",
+          eyebrowResult: "당신의 결과",
+          resultSubSuffix: "5개 특성 기반 프로필",
+          high: "높은 편",
+          low: "낮은 편",
+          midSuffix: "이 두드러진",
+          levelLabel: { low: "낮음", mid: "보통", high: "높음" },
+          disclaimer:
+            "※ 이 테스트는 빅파이브(Big Five) 성격 이론을 바탕으로 한 30문항 약식 자가진단이며, 재미와 자기이해를 위한 참고 자료입니다. 공식 심리 검사나 전문가의 평가를 대체할 수 없습니다.",
+          scaleLabels: ["전혀 아니다", "아니다", "보통이다", "그렇다", "매우 그렇다"],
+          traitMeta: {
+            E: { name: "외향성", icon: "🎉" },
+            A: { name: "우호성", icon: "💛" },
+            C: { name: "성실성", icon: "📝" },
+            N: { name: "신경증", icon: "😵" },
+            O: { name: "개방성", icon: "🌈" },
+          },
+          traitDesc: {
+            E: {
+              low: "혼자만의 시간에서 에너지를 얻고, 소수와의 깊은 교류를 선호하는 편이에요.",
+              mid: "상황에 따라 사람들과 어울리기도, 혼자 시간을 보내기도 하며 균형을 맞추는 편이에요.",
+              high: "사람들과 함께 있을 때 에너지가 솟고, 먼저 다가가고 이끄는 것을 즐기는 편이에요.",
+            },
+            A: {
+              low: "타인의 감정보다 원칙이나 사실을 우선시하고, 거절이나 직설적 표현에 부담이 적은 편이에요.",
+              mid: "상황에 따라 배려와 원칙 사이에서 균형을 잡는 편이에요.",
+              high: "주변 사람들의 감정을 세심하게 살피고, 갈등보다 조화를 우선하는 편이에요.",
+            },
+            C: {
+              low: "계획보다는 그때그때 흐름에 맞춰 움직이는 걸 편하게 느끼는 편이에요.",
+              mid: "필요할 땐 계획적으로, 때론 즉흥적으로 유연하게 움직이는 편이에요.",
+              high: "계획을 세우고 꾸준히 실행하며, 마감보다 미리 끝내두는 걸 선호하는 편이에요.",
+            },
+            N: {
+              low: "스트레스 상황에서도 비교적 담담하고, 감정 기복이 적은 편이에요.",
+              mid: "상황에 따라 예민해지기도 하지만 대체로 무난하게 감정을 다스리는 편이에요.",
+              high: "작은 자극에도 마음이 크게 흔들리고, 걱정이나 긴장을 자주 느끼는 편이에요.",
+            },
+            O: {
+              low: "익숙하고 검증된 것을 편안하게 느끼며, 새로운 시도보다 안정감을 선호하는 편이에요.",
+              mid: "익숙한 것과 새로운 것 사이에서 상황 따라 균형 있게 선택하는 편이에요.",
+              high: "새로운 아이디어와 경험에 대한 호기심이 크고, 낯선 것에 거리낌이 적은 편이에요.",
+            },
+          },
+          questions: {
+            E: [
+              "나만 빼고 열리는 모임 이야기를 들으면 신경이 쓰인다.",
+              "낯선 사람과 단둘이 있으면 침묵이 어색해서 괜히 말을 걸게 된다.",
+              "단체 사진을 찍을 때 자연스럽게 가운데로 가는 편이다.",
+              "친구와 약속을 잡을 때 내가 먼저 제안하는 편이다.",
+              "주말에 약속이 없으면 아쉽게 느껴진다.",
+              "친구가 갑자기 놀자고 하면 바로 응하는 편이다.",
+            ],
+            A: [
+              "친구가 실연하면 이유를 캐묻기보다 말없이 위로해주는 편이다.",
+              "다툰 친구에게 먼저 다가가 사과하는 편이다.",
+              "길을 헤매는 사람을 보면 먼저 다가가 도와준다.",
+              "메시지에 답장할 문구를 고르는 데 오래 고민하는 편이다.",
+              "누군가의 부탁을 거절하는 것이 어렵게 느껴진다.",
+              "대중교통에서 노약자나 임산부를 보면 먼저 자리를 양보한다.",
+            ],
+            C: [
+              "여행 계획을 세울 때 세부 일정까지 촘촘히 짜는 편이다.",
+              "할 일이나 과제를 미리미리 조금씩 해두는 편이다.",
+              "약속 시간보다 여유 있게 도착하는 편이다.",
+              "한번 보기 시작한 드라마나 애니메이션은 끝까지 챙겨보는 편이다.",
+              "방 청소를 미루지 않고 그때그때 하는 편이다.",
+              "계획한 일(다이어트 등)을 실제로 실천에 옮기는 편이다.",
+            ],
+            N: [
+              "메시지 답장이 늦으면 이런저런 생각에 빠지는 편이다.",
+              "누군가에게 지적을 받으면 그 일을 오래 마음에 담아두는 편이다.",
+              "갑작스러운 일정 변경에 쉽게 당황하는 편이다.",
+              "중요한 일을 앞두고 긴장해서 잠을 설치는 편이다.",
+              "기분이 가라앉으면 회복하는 데 시간이 걸리는 편이다.",
+              "특별한 이유 없이도 막연한 불안감을 느낄 때가 있다.",
+            ],
+            O: [
+              "궁금한 장소나 가게가 생기면 바로 가보는 편이다.",
+              "새로 나온 앱이나 기기를 남들보다 먼저 써보고 싶어진다.",
+              "익숙하지 않은 장르의 음악이나 영화도 거리낌 없이 접한다.",
+              '"만약에 ~라면" 하는 상상을 즐기는 편이다.',
+              "틀에 얽매이지 않는 삶의 방식에 끌린다.",
+              "낯선 나라의 문화나 음식에 자연스럽게 흥미가 생긴다.",
+            ],
+          },
+        },
+
+        ja: {
+          eyebrowIntro: "BIG FIVE SELF CHECK · 全30問",
+          title: "あなたの性格コンパスを<br>合わせてみよう",
+          lead: "外向性、協調性、誠実性、神経症傾向、開放性。心理学で最も広く使われている5つの性格特性で、自分を測ってみます。正解はないので、最初に浮かんだ感覚で選んでください。所要時間は約5分です。",
+          startBtn: "はじめる",
+          prevBtn: "戻る",
+          nextBtn: "次へ",
+          resultBtn: "結果を見る",
+          restartBtn: "もう一度やる",
+          eyebrowResult: "あなたの結果",
+          resultSubSuffix: "5つの特性に基づくプロフィール",
+          high: "やや高め",
+          low: "やや低め",
+          midSuffix: "が目立つタイプ",
+          levelLabel: { low: "低め", mid: "普通", high: "高め" },
+          disclaimer:
+            "※ このテストはビッグファイブ(Big Five)性格理論に基づいた全30問の簡易自己診断で、楽しみと自己理解のための参考資料です。正式な心理検査や専門家による評価に代わるものではありません。",
+          scaleLabels: ["全くそう思わない", "そう思わない", "どちらとも言えない", "そう思う", "非常にそう思う"],
+          traitMeta: {
+            E: { name: "外向性", icon: "🎉" },
+            A: { name: "協調性", icon: "💛" },
+            C: { name: "誠実性", icon: "📝" },
+            N: { name: "神経症傾向", icon: "😵" },
+            O: { name: "開放性", icon: "🌈" },
+          },
+          traitDesc: {
+            E: {
+              low: "一人の時間からエネルギーを得て、少数の相手との深い関わりを好むタイプです。",
+              mid: "状況に応じて人と関わったり一人で過ごしたりと、バランスを取るタイプです。",
+              high: "人と一緒にいるとエネルギーが湧き、自分から働きかけて場を引っ張るのを楽しむタイプです。",
+            },
+            A: {
+              low: "相手の感情より原則や事実を優先しがちで、断ったりはっきり言ったりすることに抵抗が少ないタイプです。",
+              mid: "思いやりと原則の間で、状況に応じてバランスを取るタイプです。",
+              high: "周りの気持ちを細やかに気にかけ、対立より調和を優先するタイプです。",
+            },
+            C: {
+              low: "計画よりもその場の流れに合わせて動くことを心地よく感じるタイプです。",
+              mid: "必要な時は計画的に、時には臨機応変に動く柔軟なタイプです。",
+              high: "計画を立ててコツコツ実行し、締め切りより前に終わらせることを好むタイプです。",
+            },
+            N: {
+              low: "ストレスがかかる状況でも比較的落ち着いていて、感情の起伏が少ないタイプです。",
+              mid: "状況によっては敏感になることもありますが、概ね無難に感情をコントロールするタイプです。",
+              high: "小さな刺激にも心が大きく揺れやすく、不安や緊張をよく感じるタイプです。",
+            },
+            O: {
+              low: "慣れ親しんだものに安心感を覚え、新しい挑戦より安定を好むタイプです。",
+              mid: "慣れたものと新しいものの間で、状況に応じてバランスよく選ぶタイプです。",
+              high: "新しいアイデアや経験への好奇心が強く、未知のものへの抵抗が少ないタイプです。",
+            },
+          },
+          questions: {
+            E: [
+              "誘われていない飲み会の話を聞くと、少し気になってしまうほうだ。",
+              "知らない人とエレベーターで二人きりになると、つい何か話しかけてしまうほうだ。",
+              "集合写真では自然と真ん中のポジションに行くほうだ。",
+              "友達との予定は自分から誘うことが多いほうだ。",
+              "週末に予定がないと物足りなく感じるほうだ。",
+              "友達に急に誘われたら、すぐに応じるほうだ。",
+            ],
+            A: [
+              "友達が失恋した時、理由を根掘り葉掘り聞くより黙って寄り添うほうだ。",
+              "喧嘩した友達には自分から折れて謝るほうだ。",
+              "道に迷っている人を見かけたら、自分から声をかけて助けるほうだ。",
+              "メッセージの返信の言葉選びに時間をかけて悩むほうだ。",
+              "誰かに頼まれごとをされると、断るのが苦手なほうだ。",
+              "電車でお年寄りや妊婦さんを見たら、真っ先に席を譲るほうだ。",
+            ],
+            C: [
+              "旅行の計画は分刻みで細かく立てるほうだ。",
+              "課題やタスクは早めに少しずつ片付けるほうだ。",
+              "待ち合わせには余裕を持って早めに着くほうだ。",
+              "一度見始めたドラマやアニメは最後まで見届けるほうだ。",
+              "部屋の掃除は溜めずにこまめにするほうだ。",
+              "「明日からダイエット」など、決めたことを実際に実行できるほうだ。",
+            ],
+            N: [
+              "メッセージの返信が遅いと、あれこれ考えてしまうほうだ。",
+              "誰かに指摘されると、そのことを長く引きずるほうだ。",
+              "急な予定変更に、すぐ動揺してしまうほうだ。",
+              "大事なことの前日は緊張して眠れなくなるほうだ。",
+              "落ち込むと、立ち直るまでに時間がかかるほうだ。",
+              "特に理由がなくても、なんとなく不安になることがある。",
+            ],
+            O: [
+              "気になる場所やお店があると、すぐ行ってみるほうだ。",
+              "新しいアプリやガジェットが出ると、すぐ試したくなるほうだ。",
+              "知らないジャンルの音楽や映画にも気軽に手を出すほうだ。",
+              "「もしも〜だったら」という空想を楽しむほうだ。",
+              "型にはまらない生き方に惹かれるほうだ。",
+              "知らない国の文化や食べ物に自然と興味が湧くほうだ。",
+            ],
+          },
+        },
+      };
+
+      const traitOrder = ["E", "A", "C", "N", "O"];
+      let lang = "ko";
+
+      // 문항 목록을 언어별로 만들어두되, 순서/축(trait)은 공유
+      function buildQuestions() {
+        const qs = [];
+        traitOrder.forEach((tr) => {
+          i18n[lang].questions[tr].forEach((text) => qs.push({ trait: tr, text }));
+        });
+        return qs;
+      }
+      let questions = buildQuestions();
+
+      function levelOf(pct) {
+        if (pct < 34) return "low";
+        if (pct < 67) return "mid";
+        return "high";
+      }
+
+      // ---------- 상태 ----------
+      let current = 0;
+      let answers = new Array(questions.length).fill(null); // 1~5
+
+      function setLang(newLang) {
+        lang = newLang;
+        questions = buildQuestions(); // 문항 순서/개수는 동일하므로 답변 유지 가능
+        document.getElementById("lang-ko").classList.toggle("active", lang === "ko");
+        document.getElementById("lang-ja").classList.toggle("active", lang === "ja");
+        renderStaticText();
+        if (!document.getElementById("screen-quiz").classList.contains("hidden")) {
+          renderQuestion();
+        }
+        if (!document.getElementById("screen-result").classList.contains("hidden")) {
+          showResults();
+        }
+      }
+
+      function renderStaticText() {
+        const t = i18n[lang];
+        document.getElementById("t-eyebrow-intro").textContent = t.eyebrowIntro;
+        document.getElementById("t-title").innerHTML = t.title;
+        document.getElementById("t-lead").textContent = t.lead;
+        document.getElementById("t-start-btn").textContent = t.startBtn;
+        document.getElementById("btn-prev").textContent = t.prevBtn;
+        document.getElementById("t-eyebrow-result").textContent = t.eyebrowResult;
+        document.getElementById("t-restart-btn").textContent = t.restartBtn;
+        document.getElementById("t-disclaimer").textContent = t.disclaimer;
+      }
+
+      function startQuiz() {
+        document.getElementById("screen-intro").classList.add("hidden");
+        document.getElementById("screen-quiz").classList.remove("hidden");
+        renderQuestion();
+      }
+
+      function renderQuestion() {
+        const t = i18n[lang];
+        const q = questions[current];
+        const meta = t.traitMeta[q.trait];
+        document.getElementById("q-counter").textContent = current + 1 + " / " + questions.length;
+        document.getElementById("q-trait-label").textContent = meta.name;
+        document.getElementById("q-icon").textContent = meta.icon;
+        document.getElementById("q-trait-name").textContent = meta.name;
+        document.getElementById("q-text").textContent = q.text;
+
+        const scale = document.getElementById("scale");
+        scale.innerHTML = "";
+        t.scaleLabels.forEach((label, i) => {
+          const val = i + 1;
+          const btn = document.createElement("div");
+          btn.className = "scale-btn" + (answers[current] === val ? " selected" : "");
+          btn.innerHTML = '<span class="dot"></span><span>' + label + "</span>";
+          btn.onclick = () => selectAnswer(val);
+          scale.appendChild(btn);
+        });
+
+        document.getElementById("btn-prev").style.visibility = current === 0 ? "hidden" : "visible";
+        document.getElementById("btn-next").disabled = answers[current] === null;
+        document.getElementById("btn-next").textContent = current === questions.length - 1 ? t.resultBtn : t.nextBtn;
+
+        updateProgress();
+      }
+
+      function selectAnswer(val) {
+        answers[current] = val;
+        renderQuestion();
+      }
+
+      function updateProgress() {
+        const counts = { E: 0, A: 0, C: 0, N: 0, O: 0 };
+        const totals = { E: 0, A: 0, C: 0, N: 0, O: 0 };
+        questions.forEach((q, i) => {
+          totals[q.trait]++;
+          if (answers[i] !== null) counts[q.trait]++;
+        });
+        traitOrder.forEach((tr) => {
+          const pct = totals[tr] ? (counts[tr] / totals[tr]) * 100 : 0;
+          document.getElementById("prog-" + tr).style.width = pct + "%";
+        });
+      }
+
+      function nextQuestion() {
+        if (answers[current] === null) return;
+        if (current === questions.length - 1) {
+          showResults();
+          return;
+        }
+        current++;
+        renderQuestion();
+      }
+
+      function prevQuestion() {
+        if (current === 0) return;
+        current--;
+        renderQuestion();
+      }
+
+      function showResults() {
+        const t = i18n[lang];
+        const sums = { E: 0, A: 0, C: 0, N: 0, O: 0 };
+        const counts = { E: 0, A: 0, C: 0, N: 0, O: 0 };
+        questions.forEach((q, i) => {
+          sums[q.trait] += answers[i] || 0;
+          counts[q.trait]++;
+        });
+
+        const results = traitOrder.map((tr) => {
+          const min = counts[tr] * 1,
+            max = counts[tr] * 5;
+          const pct = Math.round(((sums[tr] - min) / (max - min)) * 100);
+          const level = levelOf(pct);
+          return { trait: tr, meta: t.traitMeta[tr], pct, level, desc: t.traitDesc[tr][level] };
+        });
+
+        document.getElementById("screen-quiz").classList.add("hidden");
+        document.getElementById("screen-result").classList.remove("hidden");
+
+        const sorted = [...results].sort((a, b) => Math.abs(b.pct - 50) - Math.abs(a.pct - 50));
+        const top = sorted[0];
+        const suffix = top.level === "high" ? t.high : top.level === "low" ? t.low : t.midSuffix;
+        document.getElementById("result-title").textContent = top.meta.name + " " + suffix;
+        document.getElementById("result-sub").textContent =
+          results.map((r) => r.meta.icon).join(" ") + "  ·  " + t.resultSubSuffix;
+
+        const wrap = document.getElementById("trait-blocks");
+        wrap.innerHTML = "";
+        results.forEach((r) => {
+          const block = document.createElement("div");
+          block.className = "trait-block";
+          block.innerHTML = `
+      <div class="trait-head">
+        <span class="name">${r.meta.icon} ${r.meta.name} <span style="color:var(--cream-dim); font-weight:400;">(${t.levelLabel[r.level]})</span></span>
+        <span class="pct">${r.pct}%</span>
+      </div>
+      <div class="trait-bar"><div style="width:${r.pct}%"></div></div>
+      <div class="trait-desc">${r.desc}</div>
+    `;
+          wrap.appendChild(block);
+        });
+      }
+
+      function restartQuiz() {
+        current = 0;
+        answers = new Array(questions.length).fill(null);
+        document.getElementById("screen-result").classList.add("hidden");
+        document.getElementById("screen-intro").classList.remove("hidden");
+      }
+
+      // 초기 렌더
+      setLang("ko");
+    </script>
+  </body>
+</html>
