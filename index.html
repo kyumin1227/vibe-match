@@ -615,6 +615,7 @@
           closeRoomBtn: "마감하고 결과 보기",
           checkResultBtn: "결과 확인하기",
           notClosedMsg: "아직 방장이 결과를 공개하지 않았어요.",
+          pendingWarn: "아직 검사를 완료하지 않은 사람이 {n}명 있어요 ({names}). 그래도 마감할까요?",
 
           restartBtn: "새로 시작하기",
           eyebrowResult: "당신의 결과",
@@ -740,6 +741,7 @@
           closeRoomBtn: "締め切って結果を見る",
           checkResultBtn: "結果を確認する",
           notClosedMsg: "まだ部屋主が結果を公開していません。",
+          pendingWarn: "まだ検査を終えていない人が{n}人います（{names}）。それでも締め切りますか？",
 
           restartBtn: "最初からやり直す",
           eyebrowResult: "あなたの結果",
@@ -1119,6 +1121,16 @@
         setBtnBusy(btn, true);
         setText("wait-status", "");
         try {
+          const status = await apiCall(`/rooms/${session.roomCode}/status`, { method: "GET" });
+          if (status.pendingCount > 0) {
+            const t = i18n[lang];
+            const names = status.pendingCodenames.join(", ");
+            const msg = t.pendingWarn.replace("{n}", status.pendingCount).replace("{names}", names);
+            if (!confirm(msg)) {
+              setBtnBusy(btn, false);
+              return;
+            }
+          }
           await apiCall(`/rooms/${session.roomCode}/close`, {
             method: "POST",
             body: JSON.stringify({ hostToken: session.hostToken }),
