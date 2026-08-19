@@ -540,6 +540,7 @@
           <div class="stack-col">
             <button class="btn block" id="t-close-room-btn" onclick="closeRoomAndFetchResults()"></button>
             <button class="btn ghost block" id="t-check-result-btn" onclick="checkResults()"></button>
+            <button class="btn ghost block" id="t-back-home-2" onclick="goHome()"></button>
           </div>
           <div class="status-msg info" id="wait-status"></div>
         </div>
@@ -1018,6 +1019,7 @@
       }
 
       function beginQuiz() {
+        clearTimeout(advanceTimer);
         current = 0;
         answers = new Array(questions.length).fill(null);
         showScreen("screen-quiz");
@@ -1053,9 +1055,16 @@
         updateProgress();
       }
 
+      let advanceTimer = null;
+
       function selectAnswer(val) {
         answers[current] = val;
         renderQuestion();
+
+        clearTimeout(advanceTimer);
+        advanceTimer = setTimeout(() => {
+          nextQuestion();
+        }, 300);
       }
 
       function updateProgress() {
@@ -1072,6 +1081,7 @@
       }
 
       function nextQuestion() {
+        clearTimeout(advanceTimer);
         if (answers[current] === null) return;
         if (current === questions.length - 1) {
           submitQuizAnswers();
@@ -1082,6 +1092,7 @@
       }
 
       function prevQuestion() {
+        clearTimeout(advanceTimer);
         if (current === 0) return;
         current--;
         renderQuestion();
@@ -1279,6 +1290,7 @@
         document.getElementById("t-start-test-btn").textContent = t.startTestBtn;
         document.getElementById("t-copy-code-btn").textContent = t.copyCodeBtn;
         document.getElementById("t-back-home-1").textContent = t.backHomeBtn;
+        document.getElementById("t-back-home-2").textContent = t.backHomeBtn;
 
         document.getElementById("btn-prev").textContent = t.prevBtn;
 
