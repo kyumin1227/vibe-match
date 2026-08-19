@@ -154,6 +154,9 @@
       .btn.ghost:hover {
         background: rgba(243, 239, 227, 0.06);
       }
+      .btn.block {
+        width: 100%;
+      }
       .btn-row {
         display: flex;
         gap: 12px;
@@ -312,6 +315,131 @@
         display: none !important;
       }
 
+      /* ---- room flow ---- */
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--cream-dim);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        margin: 22px 0;
+      }
+      .divider::before,
+      .divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--line);
+      }
+      .code-input-row {
+        display: flex;
+        gap: 10px;
+      }
+      .code-input {
+        flex: 1;
+        min-width: 0;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 20px;
+        letter-spacing: 0.2em;
+        text-align: center;
+        background: rgba(243, 239, 227, 0.04);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--cream);
+        padding: 12px;
+      }
+      .code-input:focus {
+        outline: none;
+        border-color: var(--brass);
+      }
+      #nickname-input {
+        font-family: "IBM Plex Sans KR", "Noto Sans JP", sans-serif;
+        font-size: 14px;
+        letter-spacing: normal;
+        text-align: left;
+      }
+      .status-msg {
+        font-size: 12.5px;
+        text-align: center;
+        min-height: 18px;
+        margin-top: 12px;
+      }
+      .status-msg.err {
+        color: var(--coral);
+      }
+      .status-msg.info {
+        color: var(--cream-dim);
+      }
+
+      .room-code-display {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 42px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-align: center;
+        color: var(--brass-soft);
+        margin: 4px 0 2px 0;
+      }
+      .lobby-sub {
+        text-align: center;
+        color: var(--cream-dim);
+        font-size: 13px;
+        font-family: "IBM Plex Mono", monospace;
+        margin-bottom: 18px;
+      }
+      .lobby-desc {
+        color: var(--cream-dim);
+        font-size: 13.5px;
+        line-height: 1.6;
+        text-align: center;
+        margin: 0 0 26px 0;
+      }
+      .stack-row {
+        display: flex;
+        gap: 10px;
+      }
+      .stack-col {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .match-section {
+        margin-top: 26px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+      }
+      .match-section h3 {
+        font-family: "Fraunces", serif;
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+        color: var(--brass-soft);
+      }
+      .match-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 11px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+      .match-item .sim {
+        font-family: "IBM Plex Mono", monospace;
+        color: var(--brass-soft);
+        font-size: 13px;
+      }
+      .match-item.opposite {
+        border-color: rgba(200, 105, 79, 0.4);
+        background: rgba(200, 105, 79, 0.06);
+      }
+      .match-item.opposite .sim {
+        color: var(--coral);
+      }
+
       @media (max-width: 480px) {
         h1 {
           font-size: 27px;
@@ -323,6 +451,9 @@
           font-size: 19px;
           min-height: 80px;
         }
+        .room-code-display {
+          font-size: 34px;
+        }
       }
     </style>
   </head>
@@ -333,9 +464,9 @@
         <button class="lang-btn" id="lang-ja" onclick="setLang('ja')">日本語</button>
       </div>
 
-      <!-- INTRO -->
-      <div id="screen-intro">
-        <div class="eyebrow" id="t-eyebrow-intro"></div>
+      <!-- HOME -->
+      <div id="screen-home">
+        <div class="eyebrow" id="t-eyebrow-home"></div>
         <h1 id="t-title"></h1>
         <p class="lead" id="t-lead"></p>
         <div class="card">
@@ -349,9 +480,30 @@
               <circle cx="60" cy="60" r="5" fill="#F3EFE3" />
             </svg>
           </div>
-          <div style="text-align: center">
-            <button class="btn" id="t-start-btn" onclick="startQuiz()"></button>
+          <input class="code-input" id="nickname-input" maxlength="12" style="width: 100%; margin-bottom: 14px" />
+          <button class="btn block" id="t-create-btn" onclick="createRoom()"></button>
+          <div class="divider" id="t-divider"></div>
+          <div class="code-input-row">
+            <input class="code-input" id="code-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" />
+            <button class="btn ghost" id="t-join-btn" onclick="joinRoomByCode()"></button>
           </div>
+          <div class="status-msg err" id="home-status"></div>
+        </div>
+      </div>
+
+      <!-- LOBBY -->
+      <div id="screen-lobby" class="hidden">
+        <div class="eyebrow" id="t-eyebrow-lobby"></div>
+        <div class="card">
+          <div class="room-code-display" id="lobby-code"></div>
+          <div class="lobby-sub" id="lobby-codename"></div>
+          <div class="lobby-desc" id="lobby-desc"></div>
+          <div class="stack-col">
+            <button class="btn block" id="t-start-test-btn" onclick="beginQuiz()"></button>
+            <button class="btn ghost block" id="t-copy-code-btn" onclick="copyRoomCode()"></button>
+            <button class="btn ghost block" id="t-back-home-1" onclick="goHome()"></button>
+          </div>
+          <div class="status-msg info" id="lobby-status"></div>
         </div>
       </div>
 
@@ -379,6 +531,20 @@
         </div>
       </div>
 
+      <!-- WAIT (submitted, waiting on host to close / or host closes here) -->
+      <div id="screen-wait" class="hidden">
+        <div class="eyebrow" id="t-eyebrow-wait"></div>
+        <div class="card">
+          <div class="result-title" id="wait-title"></div>
+          <div class="lobby-desc" id="wait-desc"></div>
+          <div class="stack-col">
+            <button class="btn block" id="t-close-room-btn" onclick="closeRoomAndFetchResults()"></button>
+            <button class="btn ghost block" id="t-check-result-btn" onclick="checkResults()"></button>
+          </div>
+          <div class="status-msg info" id="wait-status"></div>
+        </div>
+      </div>
+
       <!-- RESULTS -->
       <div id="screen-result" class="hidden">
         <div class="eyebrow" id="t-eyebrow-result"></div>
@@ -396,8 +562,15 @@
 
           <div id="trait-blocks"></div>
 
-          <div style="text-align: center; margin-top: 10px">
-            <button class="btn ghost" id="t-restart-btn" onclick="restartQuiz()"></button>
+          <div id="match-section" class="match-section hidden">
+            <h3 id="t-top-matches-title"></h3>
+            <div id="top-matches-list"></div>
+            <h3 id="t-opposite-title" style="margin-top: 18px"></h3>
+            <div id="opposite-item"></div>
+          </div>
+
+          <div style="text-align: center; margin-top: 18px">
+            <button class="btn ghost" id="t-restart-btn" onclick="goHome()"></button>
           </div>
 
           <div class="disclaimer" id="t-disclaimer"></div>
@@ -406,23 +579,54 @@
     </div>
 
     <script>
+      const API_BASE = "https://5wem3wqvzj.execute-api.ap-northeast-2.amazonaws.com";
+
       // ---------- 다국어 텍스트 ----------
       const i18n = {
         ko: {
-          eyebrowIntro: "BIG FIVE SELF CHECK · 30문항",
-          title: "당신의 성격 나침반을<br>맞춰볼까요?",
-          lead: "외향성, 우호성, 성실성, 신경증, 개방성. 심리학에서 가장 널리 쓰이는 다섯 가지 성격 특성으로 나를 가늠해봅니다. 정답은 없으니 처음 떠오르는 느낌대로 골라주세요. 약 5분 정도 걸려요.",
-          startBtn: "시작하기",
+          eyebrowHome: "BIG FIVE CHEMISTRY · 30문항",
+          title: "친구와 성격 케미를<br>확인해볼까요?",
+          lead: "외향성, 우호성, 성실성, 신경증, 개방성. 다섯 가지 성격 특성으로 나를 알아보고, 방을 만들어 친구를 초대하면 서로 얼마나 잘 맞는지도 확인할 수 있어요.",
+          createBtn: "새 방 만들기",
+          divider: "또는",
+          nicknamePlaceholder: "별명 (선택, 비워두면 자동 생성)",
+          codePlaceholder: "6자리 코드",
+          joinBtn: "코드로 입장하기",
+          codeInvalid: "6자리 숫자 코드를 입력해주세요.",
+          networkError: "문제가 발생했어요. 잠시 후 다시 시도해주세요.",
+
+          eyebrowLobby: "방 코드",
+          lobbyCodenamePrefix: "당신의 코드네임 · ",
+          lobbyDescHost: "이 코드를 친구에게 공유하세요. 모두 검사를 마쳤다면 테스트를 마친 뒤 결과를 마감할 수 있어요.",
+          lobbyDescGuest: "방장이 알려준 코드로 입장했어요. 준비되면 검사를 시작해주세요.",
+          startTestBtn: "테스트 시작하기",
+          copyCodeBtn: "코드 복사하기",
+          copiedMsg: "코드가 복사되었어요.",
+          backHomeBtn: "처음으로",
+
           prevBtn: "이전",
           nextBtn: "다음",
           resultBtn: "결과 보기",
-          restartBtn: "다시 하기",
+
+          eyebrowWait: "제출 완료",
+          waitTitle: "검사를 완료했어요!",
+          waitDescHost: "친구들이 모두 검사를 마쳤다면, 아래 버튼으로 결과를 마감하고 확인해보세요.",
+          waitDescGuest: "방장이 결과를 마감하면 여기서 확인할 수 있어요. 잠시 후 다시 확인해주세요.",
+          closeRoomBtn: "마감하고 결과 보기",
+          checkResultBtn: "결과 확인하기",
+          notClosedMsg: "아직 방장이 결과를 공개하지 않았어요.",
+
+          restartBtn: "새로 시작하기",
           eyebrowResult: "당신의 결과",
           resultSubSuffix: "5개 특성 기반 프로필",
           high: "높은 편",
           low: "낮은 편",
           midSuffix: "이 두드러진",
           levelLabel: { low: "낮음", mid: "보통", high: "높음" },
+          topMatchesTitle: "가장 잘 맞는 상대",
+          oppositeTitle: "가장 다른 유형",
+          similaritySuffix: "% 일치",
+          noMatches: "아직 비교할 다른 참가자가 없어요.",
           disclaimer:
             "※ 이 테스트는 빅파이브(Big Five) 성격 이론을 바탕으로 한 30문항 약식 자가진단이며, 재미와 자기이해를 위한 참고 자료입니다. 공식 심리 검사나 전문가의 평가를 대체할 수 없습니다.",
           scaleLabels: ["전혀 아니다", "아니다", "보통이다", "그렇다", "매우 그렇다"],
@@ -505,20 +709,49 @@
         },
 
         ja: {
-          eyebrowIntro: "BIG FIVE SELF CHECK · 全30問",
-          title: "あなたの性格コンパスを<br>合わせてみよう",
-          lead: "外向性、協調性、誠実性、神経症傾向、開放性。心理学で最も広く使われている5つの性格特性で、自分を測ってみます。正解はないので、最初に浮かんだ感覚で選んでください。所要時間は約5分です。",
-          startBtn: "はじめる",
+          eyebrowHome: "BIG FIVE CHEMISTRY · 全30問",
+          title: "友達と性格の相性を<br>チェックしてみよう",
+          lead: "外向性、協調性、誠実性、神経症傾向、開放性。5つの性格特性で自分を知り、部屋を作って友達を招待すれば、お互いどれくらい相性がいいかも分かります。",
+          createBtn: "新しい部屋を作る",
+          divider: "または",
+          nicknamePlaceholder: "ニックネーム（任意、空欄なら自動生成）",
+          codePlaceholder: "6桁のコード",
+          joinBtn: "コードで入室する",
+          codeInvalid: "6桁の数字コードを入力してください。",
+          networkError: "問題が発生しました。しばらくしてからもう一度お試しください。",
+
+          eyebrowLobby: "部屋コード",
+          lobbyCodenamePrefix: "あなたのコードネーム · ",
+          lobbyDescHost: "このコードを友達に共有してください。みんなが検査を終えたら、検査後に結果を締め切ることができます。",
+          lobbyDescGuest: "教えてもらったコードで入室しました。準備ができたら検査を始めてください。",
+          startTestBtn: "検査を始める",
+          copyCodeBtn: "コードをコピー",
+          copiedMsg: "コードをコピーしました。",
+          backHomeBtn: "最初に戻る",
+
           prevBtn: "戻る",
           nextBtn: "次へ",
           resultBtn: "結果を見る",
-          restartBtn: "もう一度やる",
+
+          eyebrowWait: "提出完了",
+          waitTitle: "検査が完了しました！",
+          waitDescHost: "友達全員が検査を終えたら、下のボタンで結果を締め切って確認してみましょう。",
+          waitDescGuest: "部屋主が結果を締め切ると、ここで確認できます。しばらくしてからもう一度確認してください。",
+          closeRoomBtn: "締め切って結果を見る",
+          checkResultBtn: "結果を確認する",
+          notClosedMsg: "まだ部屋主が結果を公開していません。",
+
+          restartBtn: "最初からやり直す",
           eyebrowResult: "あなたの結果",
           resultSubSuffix: "5つの特性に基づくプロフィール",
           high: "やや高め",
           low: "やや低め",
           midSuffix: "が目立つタイプ",
           levelLabel: { low: "低め", mid: "普通", high: "高め" },
+          topMatchesTitle: "最も相性の良い相手",
+          oppositeTitle: "最もタイプが違う相手",
+          similaritySuffix: "% 一致",
+          noMatches: "まだ比較できる他の参加者がいません。",
           disclaimer:
             "※ このテストはビッグファイブ(Big Five)性格理論に基づいた全30問の簡易自己診断で、楽しみと自己理解のための参考資料です。正式な心理検査や専門家による評価に代わるものではありません。",
           scaleLabels: ["全くそう思わない", "そう思わない", "どちらとも言えない", "そう思う", "非常にそう思う"],
@@ -614,48 +847,182 @@
       }
       let questions = buildQuestions();
 
-      function levelOf(pct) {
-        if (pct < 34) return "low";
-        if (pct < 67) return "mid";
-        return "high";
+      // ---------- 방/참가자 상태 ----------
+      const SESSION_KEY = "chemistryRoomSession";
+      const session = {
+        roomCode: null,
+        hostToken: null,
+        participantId: null,
+        codename: null,
+        isHost: false,
+        submitted: false,
+      };
+
+      function saveSession() {
+        try {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        } catch (e) {
+          /* noop */
+        }
       }
 
-      // ---------- 상태 ----------
+      function loadSession() {
+        try {
+          const raw = localStorage.getItem(SESSION_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function clearSession() {
+        try {
+          localStorage.removeItem(SESSION_KEY);
+        } catch (e) {
+          /* noop */
+        }
+      }
+
       let current = 0;
-      let answers = new Array(questions.length).fill(null); // 1~5
+      let answers = new Array(questions.length).fill(null);
 
-      function setLang(newLang) {
-        lang = newLang;
-        questions = buildQuestions(); // 문항 순서/개수는 동일하므로 답변 유지 가능
-        document.getElementById("lang-ko").classList.toggle("active", lang === "ko");
-        document.getElementById("lang-ja").classList.toggle("active", lang === "ja");
-        renderStaticText();
-        if (!document.getElementById("screen-quiz").classList.contains("hidden")) {
-          renderQuestion();
+      function showScreen(id) {
+        ["screen-home", "screen-lobby", "screen-quiz", "screen-wait", "screen-result"].forEach((sid) => {
+          document.getElementById(sid).classList.toggle("hidden", sid !== id);
+        });
+      }
+
+      function currentScreenId() {
+        return ["screen-home", "screen-lobby", "screen-quiz", "screen-wait", "screen-result"].find(
+          (sid) => !document.getElementById(sid).classList.contains("hidden"),
+        );
+      }
+
+      async function apiCall(path, options) {
+        let res;
+        try {
+          res = await fetch(API_BASE + path, options);
+        } catch (e) {
+          throw new Error(i18n[lang].networkError);
         }
-        if (!document.getElementById("screen-result").classList.contains("hidden")) {
-          showResults();
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (e) {
+          /* noop */
+        }
+        if (!res.ok) {
+          const err = new Error(data.error || i18n[lang].networkError);
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      }
+
+      function setBtnBusy(btn, busy) {
+        if (!btn) return;
+        btn.disabled = busy;
+      }
+
+      // ---------- HOME ----------
+      function joinRoomRequest(code) {
+        const nickname = document.getElementById("nickname-input").value.trim();
+        return apiCall(`/rooms/${code}/join`, {
+          method: "POST",
+          body: JSON.stringify({ nickname }),
+        });
+      }
+
+      async function createRoom() {
+        const btn = document.getElementById("t-create-btn");
+        setBtnBusy(btn, true);
+        setText("home-status", "");
+        try {
+          const data = await apiCall("/rooms", { method: "POST" });
+          session.hostToken = data.hostToken;
+          session.isHost = true;
+          const joinData = await joinRoomRequest(data.code);
+          session.roomCode = data.code;
+          session.participantId = joinData.participantId;
+          session.codename = joinData.codename;
+          saveSession();
+          showLobby();
+        } catch (e) {
+          setText("home-status", e.message);
+        } finally {
+          setBtnBusy(btn, false);
         }
       }
 
-      function renderStaticText() {
+      async function joinRoomByCode() {
+        const btn = document.getElementById("t-join-btn");
+        const raw = document.getElementById("code-input").value.trim().replace(/\D/g, "");
+        if (raw.length !== 6) {
+          setText("home-status", i18n[lang].codeInvalid);
+          return;
+        }
+        setBtnBusy(btn, true);
+        setText("home-status", "");
+        try {
+          const joinData = await joinRoomRequest(raw);
+          session.roomCode = raw;
+          session.hostToken = null;
+          session.isHost = false;
+          session.participantId = joinData.participantId;
+          session.codename = joinData.codename;
+          saveSession();
+          showLobby();
+        } catch (e) {
+          setText("home-status", e.message);
+        } finally {
+          setBtnBusy(btn, false);
+        }
+      }
+
+      function goHome() {
+        session.roomCode = null;
+        session.hostToken = null;
+        session.participantId = null;
+        session.codename = null;
+        session.isHost = false;
+        session.submitted = false;
+        clearSession();
+        current = 0;
+        answers = new Array(questions.length).fill(null);
+        document.getElementById("code-input").value = "";
+        document.getElementById("nickname-input").value = "";
+        setText("home-status", "");
+        showScreen("screen-home");
+      }
+
+      // ---------- LOBBY ----------
+      function showLobby() {
         const t = i18n[lang];
-        document.getElementById("t-eyebrow-intro").textContent = t.eyebrowIntro;
-        document.getElementById("t-title").innerHTML = t.title;
-        document.getElementById("t-lead").textContent = t.lead;
-        document.getElementById("t-start-btn").textContent = t.startBtn;
-        document.getElementById("btn-prev").textContent = t.prevBtn;
-        document.getElementById("t-eyebrow-result").textContent = t.eyebrowResult;
-        document.getElementById("t-restart-btn").textContent = t.restartBtn;
-        document.getElementById("t-disclaimer").textContent = t.disclaimer;
+        document.getElementById("lobby-code").textContent = session.roomCode;
+        document.getElementById("lobby-codename").textContent = t.lobbyCodenamePrefix + session.codename;
+        document.getElementById("lobby-desc").textContent = session.isHost ? t.lobbyDescHost : t.lobbyDescGuest;
+        setText("lobby-status", "");
+        showScreen("screen-lobby");
       }
 
-      function startQuiz() {
-        document.getElementById("screen-intro").classList.add("hidden");
-        document.getElementById("screen-quiz").classList.remove("hidden");
+      function copyRoomCode() {
+        const code = session.roomCode || "";
+        const done = () => setText("lobby-status", i18n[lang].copiedMsg);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code).then(done).catch(done);
+        } else {
+          done();
+        }
+      }
+
+      function beginQuiz() {
+        current = 0;
+        answers = new Array(questions.length).fill(null);
+        showScreen("screen-quiz");
         renderQuestion();
       }
 
+      // ---------- QUIZ ----------
       function renderQuestion() {
         const t = i18n[lang];
         const q = questions[current];
@@ -705,7 +1072,7 @@
       function nextQuestion() {
         if (answers[current] === null) return;
         if (current === questions.length - 1) {
-          showResults();
+          submitQuizAnswers();
           return;
         }
         current++;
@@ -718,25 +1085,99 @@
         renderQuestion();
       }
 
-      function showResults() {
+      // ---------- SUBMIT / WAIT ----------
+      async function submitQuizAnswers() {
+        const btn = document.getElementById("btn-next");
+        setBtnBusy(btn, true);
+        try {
+          await apiCall(`/rooms/${session.roomCode}/answers`, {
+            method: "POST",
+            body: JSON.stringify({ participantId: session.participantId, answers }),
+          });
+          session.submitted = true;
+          saveSession();
+          showWaitScreen();
+        } catch (e) {
+          alert(e.message);
+        } finally {
+          setBtnBusy(btn, false);
+        }
+      }
+
+      function showWaitScreen() {
         const t = i18n[lang];
-        const sums = { E: 0, A: 0, C: 0, N: 0, O: 0 };
-        const counts = { E: 0, A: 0, C: 0, N: 0, O: 0 };
-        questions.forEach((q, i) => {
-          sums[q.trait] += answers[i] || 0;
-          counts[q.trait]++;
-        });
+        document.getElementById("wait-title").textContent = t.waitTitle;
+        document.getElementById("wait-desc").textContent = session.isHost ? t.waitDescHost : t.waitDescGuest;
+        document.getElementById("t-close-room-btn").classList.toggle("hidden", !session.isHost);
+        document.getElementById("t-check-result-btn").classList.toggle("hidden", session.isHost);
+        setText("wait-status", "");
+        showScreen("screen-wait");
+      }
+
+      async function closeRoomAndFetchResults() {
+        const btn = document.getElementById("t-close-room-btn");
+        setBtnBusy(btn, true);
+        setText("wait-status", "");
+        try {
+          await apiCall(`/rooms/${session.roomCode}/close`, {
+            method: "POST",
+            body: JSON.stringify({ hostToken: session.hostToken }),
+          });
+          await fetchAndShowResults();
+        } catch (e) {
+          setText("wait-status", e.message);
+        } finally {
+          setBtnBusy(btn, false);
+        }
+      }
+
+      async function checkResults() {
+        const btn = document.getElementById("t-check-result-btn");
+        setBtnBusy(btn, true);
+        setText("wait-status", "");
+        try {
+          await fetchAndShowResults();
+        } catch (e) {
+          setText("wait-status", e.message);
+        } finally {
+          setBtnBusy(btn, false);
+        }
+      }
+
+      async function fetchAndShowResults() {
+        let data;
+        try {
+          data = await apiCall(`/rooms/${session.roomCode}/results/${session.participantId}`, { method: "GET" });
+        } catch (e) {
+          if (e.status === 409) {
+            setText("wait-status", i18n[lang].notClosedMsg);
+            return;
+          }
+          throw e;
+        }
+        renderResultScreen(data);
+        showScreen("screen-result");
+      }
+
+      // ---------- RESULTS ----------
+      function levelOf(pct) {
+        if (pct < 34) return "low";
+        if (pct < 67) return "mid";
+        return "high";
+      }
+
+      let lastResultData = null;
+
+      function renderResultScreen(data) {
+        lastResultData = data;
+        const t = i18n[lang];
+        const scores = data.scores || {};
 
         const results = traitOrder.map((tr) => {
-          const min = counts[tr] * 1,
-            max = counts[tr] * 5;
-          const pct = Math.round(((sums[tr] - min) / (max - min)) * 100);
+          const pct = scores[tr] || 0;
           const level = levelOf(pct);
           return { trait: tr, meta: t.traitMeta[tr], pct, level, desc: t.traitDesc[tr][level] };
         });
-
-        document.getElementById("screen-quiz").classList.add("hidden");
-        document.getElementById("screen-result").classList.remove("hidden");
 
         const sorted = [...results].sort((a, b) => Math.abs(b.pct - 50) - Math.abs(a.pct - 50));
         const top = sorted[0];
@@ -760,17 +1201,101 @@
     `;
           wrap.appendChild(block);
         });
+
+        const matchSection = document.getElementById("match-section");
+        const topMatches = data.topMatches || [];
+        const opposite = data.opposite || null;
+
+        if (topMatches.length === 0 && !opposite) {
+          matchSection.classList.add("hidden");
+        } else {
+          matchSection.classList.remove("hidden");
+          const list = document.getElementById("top-matches-list");
+          list.innerHTML = "";
+          if (topMatches.length === 0) {
+            list.innerHTML = `<div class="status-msg info">${t.noMatches}</div>`;
+          } else {
+            topMatches.forEach((m) => {
+              const item = document.createElement("div");
+              item.className = "match-item";
+              item.innerHTML = `<span>${m.codename}</span><span class="sim">${m.similarity}${t.similaritySuffix}</span>`;
+              list.appendChild(item);
+            });
+          }
+          const oppWrap = document.getElementById("opposite-item");
+          oppWrap.innerHTML = "";
+          if (opposite) {
+            const item = document.createElement("div");
+            item.className = "match-item opposite";
+            item.innerHTML = `<span>${opposite.codename}</span><span class="sim">${opposite.similarity}${t.similaritySuffix}</span>`;
+            oppWrap.appendChild(item);
+          }
+        }
       }
 
-      function restartQuiz() {
-        current = 0;
-        answers = new Array(questions.length).fill(null);
-        document.getElementById("screen-result").classList.add("hidden");
-        document.getElementById("screen-intro").classList.remove("hidden");
+      // ---------- 언어 전환 ----------
+      function setText(id, text) {
+        document.getElementById(id).textContent = text;
+      }
+
+      function setLang(newLang) {
+        lang = newLang;
+        questions = buildQuestions();
+        document.getElementById("lang-ko").classList.toggle("active", lang === "ko");
+        document.getElementById("lang-ja").classList.toggle("active", lang === "ja");
+        renderStaticText();
+
+        const screen = currentScreenId();
+        if (screen === "screen-lobby") showLobby();
+        if (screen === "screen-quiz") renderQuestion();
+        if (screen === "screen-wait") showWaitScreen();
+        if (screen === "screen-result" && lastResultData) renderResultScreen(lastResultData);
+      }
+
+      function renderStaticText() {
+        const t = i18n[lang];
+        document.getElementById("t-eyebrow-home").textContent = t.eyebrowHome;
+        document.getElementById("t-title").innerHTML = t.title;
+        document.getElementById("t-lead").textContent = t.lead;
+        document.getElementById("nickname-input").placeholder = t.nicknamePlaceholder;
+        document.getElementById("t-create-btn").textContent = t.createBtn;
+        document.getElementById("t-divider").textContent = t.divider;
+        document.getElementById("code-input").placeholder = t.codePlaceholder;
+        document.getElementById("t-join-btn").textContent = t.joinBtn;
+
+        document.getElementById("t-eyebrow-lobby").textContent = t.eyebrowLobby;
+        document.getElementById("t-start-test-btn").textContent = t.startTestBtn;
+        document.getElementById("t-copy-code-btn").textContent = t.copyCodeBtn;
+        document.getElementById("t-back-home-1").textContent = t.backHomeBtn;
+
+        document.getElementById("btn-prev").textContent = t.prevBtn;
+
+        document.getElementById("t-eyebrow-wait").textContent = t.eyebrowWait;
+        document.getElementById("t-close-room-btn").textContent = t.closeRoomBtn;
+        document.getElementById("t-check-result-btn").textContent = t.checkResultBtn;
+
+        document.getElementById("t-eyebrow-result").textContent = t.eyebrowResult;
+        document.getElementById("t-restart-btn").textContent = t.restartBtn;
+        document.getElementById("t-disclaimer").textContent = t.disclaimer;
+        document.getElementById("t-top-matches-title").textContent = t.topMatchesTitle;
+        document.getElementById("t-opposite-title").textContent = t.oppositeTitle;
+      }
+
+      // ---------- 새로고침 후 세션 복원 ----------
+      function restoreSession() {
+        const saved = loadSession();
+        if (!saved || !saved.roomCode || !saved.participantId) return;
+        Object.assign(session, saved);
+        if (session.submitted) {
+          showWaitScreen();
+        } else {
+          showLobby();
+        }
       }
 
       // 초기 렌더
       setLang("ko");
+      restoreSession();
     </script>
   </body>
 </html>
