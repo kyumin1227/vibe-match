@@ -472,6 +472,99 @@
         color: var(--coral);
       }
 
+      /* ---- 모임 운영 조언 ---- */
+      .advice-section {
+        margin-top: 26px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+      }
+      .advice-section h3 {
+        font-family: "Fraunces", serif;
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 6px 0;
+        color: var(--brass-soft);
+      }
+      .advice-lead {
+        font-size: 12.5px;
+        color: var(--cream-dim);
+        line-height: 1.6;
+        margin: 0 0 14px 0;
+      }
+      .advice-vibe {
+        font-size: 14px;
+        line-height: 1.75;
+        padding: 14px 16px;
+        border: 1px solid rgba(212, 169, 76, 0.32);
+        background: rgba(212, 169, 76, 0.07);
+        border-radius: 12px;
+        margin-bottom: 20px;
+      }
+      .advice-block {
+        margin-bottom: 20px;
+      }
+      .advice-block h4 {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--brass-soft);
+        margin: 0 0 10px 0;
+        font-weight: 600;
+      }
+      .advice-card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 13px 15px;
+        margin-bottom: 9px;
+      }
+      .advice-card .head {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 7px;
+      }
+      .advice-card .body {
+        font-size: 13px;
+        color: var(--cream-dim);
+        line-height: 1.65;
+      }
+      .advice-card .body + .body {
+        margin-top: 6px;
+      }
+      .advice-members {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .advice-chip {
+        font-size: 12px;
+        padding: 4px 11px;
+        border-radius: 999px;
+        border: 1px solid rgba(212, 169, 76, 0.35);
+        color: var(--brass-soft);
+      }
+      .advice-list {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .advice-list li {
+        font-size: 13px;
+        color: var(--cream-dim);
+        line-height: 1.65;
+        margin-bottom: 7px;
+      }
+      .advice-list.warn li::marker {
+        color: var(--coral);
+      }
+      .advice-closing {
+        font-size: 13px;
+        color: var(--cream-dim);
+        line-height: 1.7;
+        border-left: 2px solid var(--brass);
+        padding-left: 13px;
+      }
+
       @media (max-width: 480px) {
         h1 {
           font-size: 27px;
@@ -605,6 +698,15 @@
             <div id="opposite-item"></div>
           </div>
 
+          <!-- 모임 운영 조언 (7-getGroupAdvice) -->
+          <div id="advice-section" class="advice-section">
+            <h3 id="t-advice-title"></h3>
+            <p class="advice-lead" id="t-advice-lead"></p>
+            <button class="btn ghost block" id="t-advice-btn" onclick="loadGroupAdvice()"></button>
+            <div class="status-msg info" id="advice-status"></div>
+            <div id="advice-body"></div>
+          </div>
+
           <div style="text-align: center; margin-top: 18px">
             <button class="btn ghost" id="t-restart-btn" onclick="goHome()"></button>
           </div>
@@ -665,6 +767,23 @@
           oppositeTitle: "가장 안 맞는 상대",
           similaritySuffix: "% 궁합",
           noMatches: "아직 비교할 다른 참가자가 없어요.",
+
+          adviceTitle: "이 모임, 어떻게 운영할까요?",
+          adviceLead: "참가자 전원의 성향 분포를 모아 모임 운영 조언을 만들어드려요. 개인 점수는 공개되지 않아요.",
+          adviceBtn: "운영 조언 받아보기",
+          adviceRetryBtn: "다시 시도하기",
+          adviceLoading: "조언을 만들고 있어요. 20초 정도 걸릴 수 있어요.",
+          adviceGenerating: "다른 참가자가 먼저 요청했어요. 곧 완성돼요.",
+          adviceFailed: "조언을 만들지 못했어요. 잠시 후 다시 시도해주세요.",
+          adviceLangChanged: "언어를 바꿨어요. 새 언어로 다시 만들어주세요.",
+          adviceVibeLabel: "모임 분위기",
+          adviceTraitsLabel: "특성 분포",
+          adviceGroupingLabel: "조 편성 제안",
+          adviceIcebreakersLabel: "아이스브레이킹",
+          adviceTipsLabel: "진행 팁",
+          adviceWatchOutsLabel: "미리 챙길 것",
+          adviceHowToLabel: "진행 방법",
+          adviceWhyLabel: "이 모임에 맞는 이유",
           disclaimer:
             "※ 이 테스트는 빅파이브(Big Five) 성격 이론을 바탕으로 한 30문항 약식 자가진단이며, 재미와 자기이해를 위한 참고 자료입니다. 공식 심리 검사나 전문가의 평가를 대체할 수 없습니다.",
           scaleLabels: ["전혀 아니다", "아니다", "보통이다", "그렇다", "매우 그렇다"],
@@ -792,6 +911,23 @@
           oppositeTitle: "最も相性が悪い相手",
           similaritySuffix: "% 相性",
           noMatches: "まだ比較できる他の参加者がいません。",
+
+          adviceTitle: "この集まり、どう進めますか？",
+          adviceLead: "参加者全員の傾向分布をもとに、進行のアドバイスを作ります。個人のスコアは公開されません。",
+          adviceBtn: "運営アドバイスをもらう",
+          adviceRetryBtn: "もう一度試す",
+          adviceLoading: "アドバイスを作成中です。20秒ほどかかることがあります。",
+          adviceGenerating: "他の参加者が先にリクエストしました。まもなく完成します。",
+          adviceFailed: "アドバイスを作成できませんでした。しばらくしてからもう一度お試しください。",
+          adviceLangChanged: "言語を切り替えました。新しい言語で作り直してください。",
+          adviceVibeLabel: "集まりの雰囲気",
+          adviceTraitsLabel: "特性の分布",
+          adviceGroupingLabel: "グループ分けの提案",
+          adviceIcebreakersLabel: "アイスブレイク",
+          adviceTipsLabel: "進行のコツ",
+          adviceWatchOutsLabel: "先に備えること",
+          adviceHowToLabel: "進め方",
+          adviceWhyLabel: "この集まりに合う理由",
           disclaimer:
             "※ このテストはビッグファイブ(Big Five)性格理論に基づいた全30問の簡易自己診断で、楽しみと自己理解のための参考資料です。正式な心理検査や専門家による評価に代わるものではありません。",
           scaleLabels: ["全くそう思わない", "そう思わない", "どちらとも言えない", "そう思う", "非常にそう思う"],
@@ -1029,6 +1165,7 @@
         clearSession();
         current = 0;
         answers = new Array(questions.length).fill(null);
+        lastAdvice = null;
         document.getElementById("code-input").value = "";
         document.getElementById("nickname-input").value = "";
         setText("home-status", "");
@@ -1461,6 +1598,174 @@
             oppWrap.appendChild(item);
           }
         }
+
+        syncAdviceUI();
+      }
+
+      // ---------- 모임 운영 조언 ----------
+      // 7-getGroupAdvice는 방 전체 집계를 LLM에 넘겨 진행 조언을 만든다.
+      // 응답은 방 단위로 캐시되므로, 두 번째 참가자부터는 즉시 같은 내용을 받는다.
+      let lastAdvice = null; // { lang, advice }
+      let adviceLoading = false;
+
+      function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
+      }
+
+      // LLM이 만든 문자열이라 그대로 innerHTML에 넣지 않는다
+      function esc(s) {
+        return String(s == null ? "" : s).replace(
+          /[&<>"']/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+        );
+      }
+
+      async function loadGroupAdvice() {
+        if (adviceLoading) return;
+        adviceLoading = true;
+
+        const t = i18n[lang];
+        const btn = document.getElementById("t-advice-btn");
+        const requestedLang = lang;
+        setBtnBusy(btn, true);
+        document.getElementById("advice-body").innerHTML = "";
+        setText("advice-status", t.adviceLoading);
+
+        // 202(다른 참가자가 생성 중)면 잠시 뒤 다시 물어본다
+        const MAX_POLLS = 12;
+        const POLL_INTERVAL = 3000;
+
+        try {
+          for (let i = 0; i < MAX_POLLS; i += 1) {
+            const data = await apiCall(`/rooms/${session.roomCode}/advice`, {
+              method: "POST",
+              body: JSON.stringify({ lang: requestedLang }),
+            });
+
+            if (data.status === "ready") {
+              lastAdvice = { lang: requestedLang, advice: data.advice };
+              // 기다리는 동안 사용자가 언어를 바꿨을 수 있다
+              if (requestedLang === lang) {
+                setText("advice-status", "");
+                btn.classList.add("hidden");
+                renderAdvice();
+              } else {
+                syncAdviceUI();
+              }
+              return;
+            }
+
+            setText("advice-status", i18n[lang].adviceGenerating);
+            await sleep(POLL_INTERVAL);
+          }
+          setText("advice-status", i18n[lang].adviceFailed);
+          btn.textContent = i18n[lang].adviceRetryBtn;
+        } catch (e) {
+          setText("advice-status", e.message || i18n[lang].adviceFailed);
+          btn.textContent = i18n[lang].adviceRetryBtn;
+        } finally {
+          adviceLoading = false;
+          setBtnBusy(btn, false);
+        }
+      }
+
+      function renderAdvice() {
+        const wrap = document.getElementById("advice-body");
+        wrap.innerHTML = "";
+        if (!lastAdvice) return;
+
+        const t = i18n[lang];
+        const a = lastAdvice.advice || {};
+        const html = [];
+
+        if (a.groupVibe) {
+          html.push(`<div class="advice-vibe">${esc(a.groupVibe)}</div>`);
+        }
+
+        const highlights = a.traitHighlights || [];
+        if (highlights.length) {
+          const items = highlights
+            .map((h) => {
+              const meta = t.traitMeta[h.trait];
+              const name = meta ? `${meta.icon} ${meta.name}` : esc(h.trait);
+              return `<li><strong>${name}</strong> · ${esc(h.comment)}</li>`;
+            })
+            .join("");
+          html.push(
+            `<div class="advice-block"><h4>${esc(t.adviceTraitsLabel)}</h4><ul class="advice-list">${items}</ul></div>`,
+          );
+        }
+
+        const grouping = a.grouping || [];
+        if (grouping.length) {
+          const cards = grouping
+            .map((g) => {
+              const chips = (g.members || []).map((m) => `<span class="advice-chip">${esc(m)}</span>`).join("");
+              return `<div class="advice-card">
+                <div class="head">${esc(g.groupName)}</div>
+                <div class="advice-members">${chips}</div>
+                <div class="body">${esc(g.reason)}</div>
+              </div>`;
+            })
+            .join("");
+          html.push(`<div class="advice-block"><h4>${esc(t.adviceGroupingLabel)}</h4>${cards}</div>`);
+        }
+
+        const icebreakers = a.icebreakers || [];
+        if (icebreakers.length) {
+          const cards = icebreakers
+            .map(
+              (b) => `<div class="advice-card">
+                <div class="head">${esc(b.title)}</div>
+                <div class="body"><strong>${esc(t.adviceHowToLabel)}</strong> · ${esc(b.howTo)}</div>
+                <div class="body"><strong>${esc(t.adviceWhyLabel)}</strong> · ${esc(b.why)}</div>
+              </div>`,
+            )
+            .join("");
+          html.push(`<div class="advice-block"><h4>${esc(t.adviceIcebreakersLabel)}</h4>${cards}</div>`);
+        }
+
+        const tips = a.facilitationTips || [];
+        if (tips.length) {
+          const items = tips.map((s) => `<li>${esc(s)}</li>`).join("");
+          html.push(
+            `<div class="advice-block"><h4>${esc(t.adviceTipsLabel)}</h4><ul class="advice-list">${items}</ul></div>`,
+          );
+        }
+
+        const watchOuts = a.watchOuts || [];
+        if (watchOuts.length) {
+          const items = watchOuts.map((s) => `<li>${esc(s)}</li>`).join("");
+          html.push(
+            `<div class="advice-block"><h4>${esc(t.adviceWatchOutsLabel)}</h4><ul class="advice-list warn">${items}</ul></div>`,
+          );
+        }
+
+        if (a.closingNote) {
+          html.push(`<div class="advice-closing">${esc(a.closingNote)}</div>`);
+        }
+
+        wrap.innerHTML = html.join("");
+      }
+
+      // 조언 영역의 버튼/안내 문구를 현재 상태에 맞춘다
+      function syncAdviceUI() {
+        const t = i18n[lang];
+        const btn = document.getElementById("t-advice-btn");
+        const body = document.getElementById("advice-body");
+
+        if (lastAdvice && lastAdvice.lang === lang) {
+          btn.classList.add("hidden");
+          setText("advice-status", "");
+          renderAdvice();
+          return;
+        }
+
+        body.innerHTML = "";
+        btn.classList.remove("hidden");
+        btn.textContent = t.adviceBtn;
+        // 다른 언어로 이미 받아둔 경우, 그 언어 결과는 재사용할 수 없다
+        setText("advice-status", lastAdvice ? t.adviceLangChanged : "");
       }
 
       // ---------- 언어 전환 ----------
@@ -1510,6 +1815,9 @@
         document.getElementById("t-disclaimer").textContent = t.disclaimer;
         document.getElementById("t-top-matches-title").textContent = t.topMatchesTitle;
         document.getElementById("t-opposite-title").textContent = t.oppositeTitle;
+
+        document.getElementById("t-advice-title").textContent = t.adviceTitle;
+        document.getElementById("t-advice-lead").textContent = t.adviceLead;
       }
 
       // ---------- 새로고침 후 세션 복원 ----------
