@@ -27,16 +27,41 @@ function respond(statusCode, body) {
 
 const TRAIT_ORDER = ['E', 'A', 'C', 'N', 'O'];
 
-function similarity(scoresA, scoresB) {
-  const diffs = TRAIT_ORDER.map((tr) => Math.abs(scoresA[tr] - scoresB[tr]));
-  const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
-  return Math.round(100 - avgDiff);
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// 특성별로 다른 궁합 규칙을 적용한다 (단순 유사도가 아니라 MBTI 궁합 느낌의 상호보완 반영).
+function traitScore(trait, a, b) {
+  const diff = Math.abs(a - b);
+
+  if (trait === 'A' || trait === 'C' || trait === 'O') {
+    // 우호성/성실성/개방성: 비슷할수록 좋음 (생활 방식·가치관 마찰이 적음)
+    return 100 - diff;
+  }
+
+  if (trait === 'E') {
+    // 외향성: 적당히 다른 쪽이 오히려 좋음 (한쪽이 이끌고 한쪽이 맞춰주는 조합)
+    const idealDiff = 35;
+    const penaltyFactor = 0.8;
+    return clamp(100 - Math.abs(diff - idealDiff) * penaltyFactor, 0, 100);
+  }
+
+  // N(신경증): 둘 다 낮을수록 좋고, 한쪽만 높아도 감점, 둘 다 높으면 크게 감점
+  const avgStability = 100 - (a + b) / 2;
+  const gapPenalty = diff * 0.3;
+  return clamp(avgStability - gapPenalty, 0, 100);
+}
+
+function compatibility(scoresA, scoresB) {
+  const total = TRAIT_ORDER.reduce((sum, tr) => sum + traitScore(tr, scoresA[tr], scoresB[tr]), 0);
+  return Math.round(total / TRAIT_ORDER.length);
 }
 
 function rankMatches(target, others, topN) {
   const ranked = others
     .filter((o) => o.participantId !== target.participantId)
-    .map((o) => ({ participantId: o.participantId, codename: o.codename, similarity: similarity(target.scores, o.scores) }))
+    .map((o) => ({ participantId: o.participantId, codename: o.codename, similarity: compatibility(target.scores, o.scores) }))
     .sort((a, b) => b.similarity - a.similarity);
 
   const topMatches = ranked.slice(0, topN);

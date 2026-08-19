@@ -249,10 +249,24 @@
         background: var(--brass);
       }
 
+      .type-code {
+        display: block;
+        width: fit-content;
+        margin: 0 auto 10px auto;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        color: var(--forest-deep);
+        background: var(--brass-soft);
+        border-radius: 999px;
+        padding: 4px 14px;
+        font-weight: 600;
+      }
       .result-title {
         font-family: "Fraunces", serif;
         font-weight: 600;
-        font-size: 25px;
+        font-size: 24px;
+        line-height: 1.35;
         text-align: center;
         margin: 4px 0 6px 0;
         color: var(--brass-soft);
@@ -558,6 +572,7 @@
               <circle cx="60" cy="60" r="5" fill="#F3EFE3" />
             </svg>
           </div>
+          <div class="type-code" id="result-code"></div>
           <div class="result-title" id="result-title"></div>
           <div class="result-sub" id="result-sub"></div>
 
@@ -626,8 +641,8 @@
           midSuffix: "이 두드러진",
           levelLabel: { low: "낮음", mid: "보통", high: "높음" },
           topMatchesTitle: "가장 잘 맞는 상대",
-          oppositeTitle: "가장 다른 유형",
-          similaritySuffix: "% 일치",
+          oppositeTitle: "가장 안 맞는 상대",
+          similaritySuffix: "% 궁합",
           noMatches: "아직 비교할 다른 참가자가 없어요.",
           disclaimer:
             "※ 이 테스트는 빅파이브(Big Five) 성격 이론을 바탕으로 한 30문항 약식 자가진단이며, 재미와 자기이해를 위한 참고 자료입니다. 공식 심리 검사나 전문가의 평가를 대체할 수 없습니다.",
@@ -752,8 +767,8 @@
           midSuffix: "が目立つタイプ",
           levelLabel: { low: "低め", mid: "普通", high: "高め" },
           topMatchesTitle: "最も相性の良い相手",
-          oppositeTitle: "最もタイプが違う相手",
-          similaritySuffix: "% 一致",
+          oppositeTitle: "最も相性が悪い相手",
+          similaritySuffix: "% 相性",
           noMatches: "まだ比較できる他の参加者がいません。",
           disclaimer:
             "※ このテストはビッグファイブ(Big Five)性格理論に基づいた全30問の簡易自己診断で、楽しみと自己理解のための参考資料です。正式な心理検査や専門家による評価に代わるものではありません。",
@@ -1189,6 +1204,55 @@
         return "high";
       }
 
+      // MBTI 스타일 5글자 유형 코드 + 캐릭터 이름을 조합해서 만든다.
+      // 코드 자리: E/I(외향성) F/D(우호성) P/S(성실성) T/M(신경증) V/G(개방성)
+      const ARCHETYPES = {
+        ko: {
+          eAdj: { high: "무대를 즐기는", low: "혼자만의 시간을 아끼는" },
+          aAdj: { high: "다정하고", low: "소신 있고" },
+          nAdj: { high: "섬세한", low: "흔들림 없는" },
+          nouns: { high_high: "설계자", high_low: "수호자", low_high: "탐험가", low_low: "자유인" },
+          emoji: { high_high: "🏛️", high_low: "🛡️", low_high: "🧭", low_low: "🎈" },
+        },
+        ja: {
+          eAdj: { high: "舞台を楽しむ", low: "一人の時間を大切にする" },
+          aAdj: { high: "温かくて", low: "率直で" },
+          nAdj: { high: "繊細な", low: "動じない" },
+          nouns: { high_high: "建築家", high_low: "守護者", low_high: "探検家", low_low: "自由人" },
+          emoji: { high_high: "🏛️", high_low: "🛡️", low_high: "🧭", low_low: "🎈" },
+        },
+      };
+
+      function binaryLevel(pct) {
+        return pct >= 50 ? "high" : "low";
+      }
+
+      function computeArchetype(scores, targetLang) {
+        const eLv = binaryLevel(scores.E || 0);
+        const aLv = binaryLevel(scores.A || 0);
+        const cLv = binaryLevel(scores.C || 0);
+        const nLv = binaryLevel(scores.N || 0);
+        const oLv = binaryLevel(scores.O || 0);
+
+        const code =
+          (eLv === "high" ? "E" : "I") +
+          (aLv === "high" ? "F" : "D") +
+          (cLv === "high" ? "P" : "S") +
+          (nLv === "high" ? "T" : "M") +
+          (oLv === "high" ? "V" : "G");
+
+        const frag = ARCHETYPES[targetLang];
+        const nounKey = cLv + "_" + oLv;
+        const noun = frag.nouns[nounKey];
+        const emoji = frag.emoji[nounKey];
+        const title =
+          targetLang === "ja"
+            ? `${frag.eAdj[eLv]}、${frag.aAdj[aLv]}${frag.nAdj[nLv]}${noun}`
+            : `${frag.eAdj[eLv]} ${frag.aAdj[aLv]} ${frag.nAdj[nLv]} ${noun}`;
+
+        return { code, emoji, title };
+      }
+
       let lastResultData = null;
 
       function renderResultScreen(data) {
@@ -1202,10 +1266,9 @@
           return { trait: tr, meta: t.traitMeta[tr], pct, level, desc: t.traitDesc[tr][level] };
         });
 
-        const sorted = [...results].sort((a, b) => Math.abs(b.pct - 50) - Math.abs(a.pct - 50));
-        const top = sorted[0];
-        const suffix = top.level === "high" ? t.high : top.level === "low" ? t.low : t.midSuffix;
-        document.getElementById("result-title").textContent = top.meta.name + " " + suffix;
+        const archetype = computeArchetype(scores, lang);
+        document.getElementById("result-code").textContent = "TYPE · " + archetype.code;
+        document.getElementById("result-title").textContent = archetype.emoji + " " + archetype.title;
         document.getElementById("result-sub").textContent =
           results.map((r) => r.meta.icon).join(" ") + "  ·  " + t.resultSubSuffix;
 
