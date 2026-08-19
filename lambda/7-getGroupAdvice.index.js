@@ -46,18 +46,6 @@ function getApiKey() {
   return raw.trim().replace(/^["']|["']$/g, "");
 }
 
-// OpenAI 키(sk-proj-…)를 잘못 넣으면 원인이 "API key is invalid" 뿐이라 찾기 어렵다.
-// 막지는 않고(접두사 규칙이 바뀔 수 있으므로) 로그로만 알린다.
-function warnIfNotAnthropicKey() {
-  const key = getApiKey();
-  if (key && !key.startsWith("sk-ant-")) {
-    console.error(
-      `ANTHROPIC_API_KEY가 Anthropic 키 형식이 아닙니다 (접두사 "${key.slice(0, 7)}"). ` +
-        'Anthropic 키는 "sk-ant-"로 시작합니다. OpenAI 키(sk-proj-…)를 넣지 않았는지 확인하세요.',
-    );
-  }
-}
-
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
@@ -410,7 +398,6 @@ exports.handler = async (event) => {
     console.error("ANTHROPIC_API_KEY 환경변수가 없습니다.");
     return respond(500, { error: "AI 조언 기능이 설정되지 않았습니다." });
   }
-  warnIfNotAnthropicKey();
 
   const code = event.pathParameters && event.pathParameters.code;
   if (!code) return respond(400, { error: "code가 필요합니다." });
