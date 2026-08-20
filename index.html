@@ -358,21 +358,27 @@
       }
 
       /* ---- room flow ---- */
-      .divider {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        color: var(--cream-dim);
+      .create-link {
+        display: block;
+        margin: 0 0 22px auto;
         font-family: "IBM Plex Mono", monospace;
         font-size: 12px;
-        margin: 22px 0;
+        letter-spacing: 0.05em;
+        background: transparent;
+        color: var(--cream-dim);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: all 0.15s ease;
       }
-      .divider::before,
-      .divider::after {
-        content: "";
-        flex: 1;
-        height: 1px;
-        background: var(--line);
+      .create-link:hover {
+        border-color: var(--brass);
+        color: var(--cream);
+      }
+      .create-link:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
       }
       .code-input-row {
         display: flex;
@@ -605,6 +611,7 @@
         <h1 id="t-title"></h1>
         <p class="lead" id="t-lead"></p>
         <div class="card">
+          <button class="create-link" id="t-create-btn" onclick="createRoom()"></button>
           <div class="compass">
             <svg viewBox="0 0 120 120" width="120" height="120" fill="none">
               <circle cx="60" cy="60" r="56" stroke="#D4A94C" stroke-opacity="0.35" stroke-width="1" />
@@ -616,11 +623,9 @@
             </svg>
           </div>
           <input class="code-input" id="nickname-input" maxlength="12" style="width: 100%; margin-bottom: 14px" />
-          <button class="btn block" id="t-create-btn" onclick="createRoom()"></button>
-          <div class="divider" id="t-divider"></div>
           <div class="code-input-row">
             <input class="code-input" id="code-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" />
-            <button class="btn ghost" id="t-join-btn" onclick="joinRoomByCode()"></button>
+            <button class="btn" id="t-join-btn" onclick="joinRoomByCode()"></button>
           </div>
           <div class="status-msg err" id="home-status"></div>
         </div>
@@ -729,8 +734,7 @@
           title: "친구와 성격 케미를<br>확인해볼까요?",
           lead: "외향성, 우호성, 성실성, 신경증, 개방성. 다섯 가지 성격 특성으로 나를 알아보고, 방을 만들어 친구를 초대하면 서로 얼마나 잘 맞는지도 확인할 수 있어요.",
           createBtn: "새 방 만들기",
-          divider: "또는",
-          nicknamePlaceholder: "별명 (선택, 비워두면 자동 생성)",
+          nicknamePlaceholder: "이름 (선택, 비워두면 자동 생성)",
           codePlaceholder: "6자리 코드",
           joinBtn: "코드로 입장하기",
           codeInvalid: "6자리 숫자 코드를 입력해주세요.",
@@ -873,8 +877,7 @@
           title: "友達と性格の相性を<br>チェックしてみよう",
           lead: "外向性、協調性、誠実性、神経症傾向、開放性。5つの性格特性で自分を知り、部屋を作って友達を招待すれば、お互いどれくらい相性がいいかも分かります。",
           createBtn: "新しい部屋を作る",
-          divider: "または",
-          nicknamePlaceholder: "ニックネーム（任意、空欄なら自動生成）",
+          nicknamePlaceholder: "名前（任意、空欄なら自動生成）",
           codePlaceholder: "6桁のコード",
           joinBtn: "コードで入室する",
           codeInvalid: "6桁の数字コードを入力してください。",
@@ -1802,7 +1805,6 @@
         document.getElementById("t-lead").textContent = t.lead;
         document.getElementById("nickname-input").placeholder = t.nicknamePlaceholder;
         document.getElementById("t-create-btn").textContent = t.createBtn;
-        document.getElementById("t-divider").textContent = t.divider;
         document.getElementById("code-input").placeholder = t.codePlaceholder;
         document.getElementById("t-join-btn").textContent = t.joinBtn;
 
