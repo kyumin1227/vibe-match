@@ -507,6 +507,32 @@
         line-height: 1.6;
         margin: 0 0 14px 0;
       }
+      .advice-groupsize-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .advice-groupsize-row label {
+        font-size: 13px;
+        color: var(--cream-dim);
+      }
+      .advice-groupsize-input {
+        width: 56px;
+        text-align: center;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 14px;
+        color: var(--cream);
+        background: rgba(243, 239, 227, 0.05);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 4px;
+      }
+      .advice-groupsize-input:focus {
+        outline: none;
+        border-color: var(--brass);
+      }
       .advice-vibe {
         font-size: 14px;
         line-height: 1.75;
@@ -710,6 +736,19 @@
           <div id="advice-section" class="advice-section">
             <h3 id="t-advice-title"></h3>
             <p class="advice-lead" id="t-advice-lead"></p>
+            <div class="advice-groupsize-row" id="advice-groupsize-row">
+              <label for="advice-groupsize-input" id="t-advice-groupsize-label"></label>
+              <input
+                type="number"
+                id="advice-groupsize-input"
+                class="advice-groupsize-input"
+                min="2"
+                max="10"
+                step="1"
+                value="4"
+                oninput="onGroupSizeInputChanged()"
+              />
+            </div>
             <button class="btn ghost block" id="t-advice-btn" onclick="loadGroupAdvice()"></button>
             <div class="status-msg info" id="advice-status"></div>
             <div id="advice-body"></div>
@@ -779,6 +818,7 @@
           adviceLead: "참가자 전원의 성향 분포를 모아 모임 운영 조언을 만들어드려요. 개인 점수는 공개되지 않아요.",
           adviceBtn: "운영 조언 받아보기",
           adviceRetryBtn: "다시 시도하기",
+          adviceRegroupBtn: "바뀐 인원수로 다시 편성하기",
           adviceLoading: "조언을 만들고 있어요. 20초 정도 걸릴 수 있어요.",
           adviceGenerating: "다른 참가자가 먼저 요청했어요. 곧 완성돼요.",
           adviceFailed: "조언을 만들지 못했어요. 잠시 후 다시 시도해주세요.",
@@ -791,6 +831,7 @@
           adviceWatchOutsLabel: "미리 챙길 것",
           adviceHowToLabel: "진행 방법",
           adviceWhyLabel: "이 모임에 맞는 이유",
+          adviceGroupSizeLabel: "한 조 인원",
           disclaimer:
             "※ 이 테스트는 빅파이브(Big Five) 성격 이론을 바탕으로 한 30문항 약식 자가진단이며, 재미와 자기이해를 위한 참고 자료입니다. 공식 심리 검사나 전문가의 평가를 대체할 수 없습니다.",
           scaleLabels: ["전혀 아니다", "아니다", "보통이다", "그렇다", "매우 그렇다"],
@@ -922,6 +963,7 @@
           adviceLead: "参加者全員の傾向分布をもとに、進行のアドバイスを作ります。個人のスコアは公開されません。",
           adviceBtn: "運営アドバイスをもらう",
           adviceRetryBtn: "もう一度試す",
+          adviceRegroupBtn: "変更した人数で再編成する",
           adviceLoading: "アドバイスを作成中です。20秒ほどかかることがあります。",
           adviceGenerating: "他の参加者が先にリクエストしました。まもなく完成します。",
           adviceFailed: "アドバイスを作成できませんでした。しばらくしてからもう一度お試しください。",
@@ -934,6 +976,7 @@
           adviceWatchOutsLabel: "先に備えること",
           adviceHowToLabel: "進め方",
           adviceWhyLabel: "この集まりに合う理由",
+          adviceGroupSizeLabel: "1グループの人数",
           disclaimer:
             "※ このテストはビッグファイブ(Big Five)性格理論に基づいた全30問の簡易自己診断で、楽しみと自己理解のための参考資料です。正式な心理検査や専門家による評価に代わるものではありません。",
           scaleLabels: ["全くそう思わない", "そう思わない", "どちらとも言えない", "そう思う", "非常にそう思う"],
@@ -1616,7 +1659,7 @@
       // ---------- 모임 운영 조언 ----------
       // 7-getGroupAdvice는 방 전체 집계를 LLM에 넘겨 진행 조언을 만든다.
       // 응답은 방 단위로 캐시되므로, 두 번째 참가자부터는 즉시 같은 내용을 받는다.
-      let lastAdvice = null; // { lang, advice }
+      let lastAdvice = null; // { lang, advice, groupSize }
       let adviceLoading = false;
 
       function sleep(ms) {
@@ -1631,6 +1674,14 @@
         );
       }
 
+      // 조 인원수 입력값을 안전한 범위(2~10)로 정리한다. Lambda도 같은 범위를 강제하니
+      // 여기서는 UX용으로만 맞추고, 최종 검증은 서버가 한다.
+      function getGroupSizeInput() {
+        const raw = parseInt(document.getElementById("advice-groupsize-input").value, 10);
+        if (!Number.isInteger(raw) || raw < 2 || raw > 10) return 4;
+        return raw;
+      }
+
       async function loadGroupAdvice() {
         if (adviceLoading) return;
         adviceLoading = true;
@@ -1638,6 +1689,7 @@
         const t = i18n[lang];
         const btn = document.getElementById("t-advice-btn");
         const requestedLang = lang;
+        const groupSize = getGroupSizeInput();
         setBtnBusy(btn, true);
         document.getElementById("advice-body").innerHTML = "";
         setText("advice-status", t.adviceLoading);
@@ -1650,11 +1702,11 @@
           for (let i = 0; i < MAX_POLLS; i += 1) {
             const data = await apiCall(`/rooms/${session.roomCode}/advice`, {
               method: "POST",
-              body: JSON.stringify({ lang: requestedLang }),
+              body: JSON.stringify({ lang: requestedLang, groupSize }),
             });
 
             if (data.status === "ready") {
-              lastAdvice = { lang: requestedLang, advice: data.advice };
+              lastAdvice = { lang: requestedLang, advice: data.advice, groupSize: data.groupSize || groupSize };
               // 기다리는 동안 사용자가 언어를 바꿨을 수 있다
               if (requestedLang === lang) {
                 setText("advice-status", "");
@@ -1759,13 +1811,27 @@
         wrap.innerHTML = html.join("");
       }
 
+      // 조 인원수를 바꾸면, 이미 결과를 받아본 상태여도 버튼을 다시 보여준다.
+      // Lambda는 조 편성만 캐시 없이 즉시 재계산하므로(LLM 재호출 없음) 눌러도 빠르다.
+      function onGroupSizeInputChanged() {
+        if (!lastAdvice || lastAdvice.lang !== lang) return;
+        const groupSize = getGroupSizeInput();
+        if (groupSize === lastAdvice.groupSize) return; // 값이 그대로면 굳이 다시 보여줄 필요 없음
+        const btn = document.getElementById("t-advice-btn");
+        btn.classList.remove("hidden");
+        btn.textContent = i18n[lang].adviceRegroupBtn;
+        setText("advice-status", "");
+      }
+
       // 조언 영역의 버튼/안내 문구를 현재 상태에 맞춘다
       function syncAdviceUI() {
         const t = i18n[lang];
         const btn = document.getElementById("t-advice-btn");
         const body = document.getElementById("advice-body");
+        const groupSizeInput = document.getElementById("advice-groupsize-input");
 
         if (lastAdvice && lastAdvice.lang === lang) {
+          groupSizeInput.value = lastAdvice.groupSize || 4;
           btn.classList.add("hidden");
           setText("advice-status", "");
           renderAdvice();
@@ -1828,6 +1894,7 @@
 
         document.getElementById("t-advice-title").textContent = t.adviceTitle;
         document.getElementById("t-advice-lead").textContent = t.adviceLead;
+        document.getElementById("t-advice-groupsize-label").textContent = t.adviceGroupSizeLabel;
       }
 
       // ---------- 새로고침 후 세션 복원 ----------

@@ -38,6 +38,7 @@ const {
   QueryCommand,
   PutCommand,
   DeleteCommand,
+  BatchWriteCommand,
 } = require("@aws-sdk/lib-dynamodb");
 const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
 
@@ -47,7 +48,7 @@ const TABLE_NAME = process.env.TABLE_NAME;
 
 const ROOM_TTL_SECONDS = 60 * 60 * 24 * 2; // 48시간 (다른 항목과 동일)
 const MODEL = "claude-sonnet-4-6";
-const PROMPT_VERSION = "v5"; // Sonnet 4.6 + 구조화 출력으로 전환 — 이전 캐시와 형식이 달라 버전을 올린다.
+const PROMPT_VERSION = "v6"; // 조 편성을 LLM 대신 코드가 계산하도록 변경 — 스키마가 달라져 버전을 올린다.
 const CLAIM_STALE_SECONDS = 120; // 생성 중 표시가 이 시간을 넘기면 죽은 것으로 보고 다시 시도
 
 const BEDROCK_MODEL_ID = "global.anthropic.claude-sonnet-4-6";
@@ -55,6 +56,67 @@ const BEDROCK_ANTHROPIC_VERSION = "bedrock-2023-05-31";
 const LLM_TIMEOUT_MS = 25_000;
 
 const bedrock = new BedrockRuntimeClient({});
+
+// ────────────────────────────────────────────────────────────
+// 개발자 전용 시딩 기능 (부하테스트용)
+// ────────────────────────────────────────────────────────────
+//
+// 환경변수 SEED_SECRET을 설정해두고, 요청 body에 같은 값을 seedSecret으로 넣어 보내면
+// 이 방에 가짜 참가자 N명을 즉시 채워넣고 CLOSED로 마감한 뒤, 곧바로 평소 흐름(조언 생성)으로
+// 이어간다. Lambda 콘솔 Test 버튼 한 번으로 50명 스케일을 재현하기 위한 것.
+//
+// SEED_SECRET을 설정하지 않으면 이 기능은 완전히 꺼져 있다 (기본값이 안전한 쪽).
+// 실제 프런트(index.html)는 이 필드를 절대 보내지 않으므로, 실서비스 사용자는 건드릴 수 없다.
+const SEED_PARTICIPANT_COUNT = 50;
+const SEED_ADJ = ["조용한", "씩씩한", "느긋한", "반짝이는", "엉뚱한", "다정한", "차분한", "용감한", "포근한", "경쾌한"];
+const SEED_NOUN = ["너구리", "은하수", "파도", "고양이", "민들레", "폭풍", "반딧불", "고래", "여우", "구름"];
+
+function getSeedSecret() {
+  return (process.env.SEED_SECRET || "").trim();
+}
+
+function randomFakeScores() {
+  const scores = {};
+  TRAIT_ORDER.forEach((tr) => {
+    scores[tr] = Math.floor(Math.random() * 101);
+  });
+  return scores;
+}
+
+async function seedFakeRoom(code, count) {
+  const now = Math.floor(Date.now() / 1000);
+  const ttl = now + ROOM_TTL_SECONDS;
+
+  // 방이 이미 있으면 그 방을 그대로 쓰고, 없으면 새로 만든다.
+  const existingRoom = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `ROOM#${code}`, SK: "META" } }));
+  const roomItem = existingRoom.Item || {
+    PK: `ROOM#${code}`,
+    SK: "META",
+    hostToken: crypto.randomUUID(),
+    createdAt: now,
+    ttl,
+  };
+
+  const items = Array.from({ length: count }, (_, i) => ({
+    PutRequest: {
+      Item: {
+        PK: `ROOM#${code}`,
+        SK: `PARTICIPANT#seed-${i}-${crypto.randomUUID().slice(0, 8)}`,
+        codename: `${SEED_ADJ[i % SEED_ADJ.length]} ${SEED_NOUN[Math.floor(i / SEED_ADJ.length) % SEED_NOUN.length]}${i}`,
+        answers: null,
+        scores: randomFakeScores(),
+        ttl,
+      },
+    },
+  }));
+
+  for (let i = 0; i < items.length; i += 25) {
+    await ddb.send(new BatchWriteCommand({ RequestItems: { [TABLE_NAME]: items.slice(i, i + 25) } }));
+  }
+
+  // 조언은 방이 CLOSED일 때만 생성되니, 시딩과 동시에 마감까지 처리한다.
+  await ddb.send(new PutCommand({ TableName: TABLE_NAME, Item: { ...roomItem, status: "CLOSED" } }));
+}
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -159,6 +221,86 @@ function buildStats(participants) {
 }
 
 // ────────────────────────────────────────────────────────────
+// 조 편성 (규칙 기반. AI에게 시키지 않는다)
+// ────────────────────────────────────────────────────────────
+//
+// LLM이 참가자 전원의 이름을 조 배열에 직접 나열하게 하면, 인원이 늘수록 출력 토큰이
+// 그만큼 늘어난다. 50명 방에서 실측으로 API Gateway 타임아웃(약 29초)을 넘기고 실패하는 게
+// 확인됐다. 조 편성은 궁합 점수만으로 결정되는 계산이라 애초에 AI가 필요 없다 — 규칙 기반으로
+// 바꾸면 인원수와 무관하게 항상 빠르다.
+
+const DEFAULT_GROUP_SIZE = 4;
+const MIN_GROUP_SIZE = 2;
+const MAX_GROUP_SIZE = 10;
+
+// 요청으로 들어온 groupSize를 안전한 범위로 정리한다. 잘못된 값이면 기본값(4)을 쓴다.
+function normalizeGroupSize(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < MIN_GROUP_SIZE || n > MAX_GROUP_SIZE) return DEFAULT_GROUP_SIZE;
+  return n;
+}
+
+const GROUPING_REASON = {
+  ko: {
+    high: (avg) => `평균 궁합 ${avg}점 · 결이 잘 맞아 편하게 진행할 수 있는 조합이에요.`,
+    mid: (avg) => `평균 궁합 ${avg}점 · 무난하게 어울리는 조합이에요.`,
+    low: (avg) => `평균 궁합 ${avg}점 · 속도와 방식이 다양해 서로 배울 점이 많은 조합이에요.`,
+  },
+  ja: {
+    high: (avg) => `平均相性 ${avg}点 · 相性が良く進めやすい組み合わせです。`,
+    mid: (avg) => `平均相性 ${avg}点 · 無理なく馴染む組み合わせです。`,
+    low: (avg) => `平均相性 ${avg}点 · テンポや進め方が多様で学び合える組み合わせです。`,
+  },
+};
+
+function groupingReason(avg, lang) {
+  const t = GROUPING_REASON[lang];
+  if (avg >= 80) return t.high(avg);
+  if (avg >= 65) return t.mid(avg);
+  return t.low(avg);
+}
+
+// 궁합이 좋은 사람끼리 그리디하게 묶는다. 최적해는 아니지만 참고용 조 편성으론 충분하고,
+// 인원수에 선형적으로만 비례해 어떤 규모에서도 빠르다.
+function buildGrouping(participants, lang, groupSize) {
+  const remaining = [...participants];
+  const groups = [];
+
+  while (remaining.length > 0) {
+    const seed = remaining.shift();
+    const group = [seed];
+    while (group.length < groupSize && remaining.length > 0) {
+      let bestIdx = 0;
+      let bestScore = -Infinity;
+      remaining.forEach((cand, idx) => {
+        const score = compatibility(seed.scores, cand.scores);
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = idx;
+        }
+      });
+      group.push(remaining.splice(bestIdx, 1)[0]);
+    }
+    groups.push(group);
+  }
+
+  return groups.map((group, i) => {
+    const pairScores = [];
+    for (let a = 0; a < group.length; a += 1) {
+      for (let b = a + 1; b < group.length; b += 1) {
+        pairScores.push(compatibility(group[a].scores, group[b].scores));
+      }
+    }
+    const avg = pairScores.length ? Math.round(mean(pairScores)) : 100;
+    return {
+      groupName: lang === "ja" ? `${i + 1}班` : `${i + 1}조`,
+      members: group.map((p) => p.codename),
+      reason: groupingReason(avg, lang),
+    };
+  });
+}
+
+// ────────────────────────────────────────────────────────────
 // 프롬프트
 // ────────────────────────────────────────────────────────────
 
@@ -180,7 +322,7 @@ Big Five(외향성 E, 친화성 A, 성실성 C, 정서 민감성 N, 개방성 O)
 const ADVICE_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["groupVibe", "traitHighlights", "grouping", "icebreakers", "facilitationTips"],
+  required: ["groupVibe", "traitHighlights", "icebreakers", "facilitationTips"],
   properties: {
     groupVibe: {
       type: "string",
@@ -197,21 +339,6 @@ const ADVICE_SCHEMA = {
         properties: {
           trait: { type: "string", enum: TRAIT_ORDER },
           comment: { type: "string", description: "한 문장" },
-        },
-      },
-    },
-    grouping: {
-      type: "array",
-      minItems: 1,
-      description: "조 편성. 전원 배치, 각 조 이유는 한 문장",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["groupName", "members", "reason"],
-        properties: {
-          groupName: { type: "string" },
-          members: { type: "array", items: { type: "string" }, description: "참가자 별명" },
-          reason: { type: "string", description: "한 문장" },
         },
       },
     },
@@ -249,8 +376,8 @@ function buildUserPrompt(stats, lang) {
     )
     .join("\n");
 
-  const memberLines = stats.members.map((m) => `- ${m.codename}: 두드러진 특성 ${m.topTraits.join(", ")}`).join("\n");
-
+  // 참가자 이름을 전원 나열하지 않는다 — 인원이 늘어도 프롬프트 크기가 커지지 않게 하기 위함.
+  // 조 편성은 이제 buildGrouping()이 규칙 기반으로 계산하고, LLM에는 집계 수치만 준다.
   const bestLines = stats.pairs.best.map((p) => `- ${p.a} × ${p.b}: ${p.score}`).join("\n");
   const hardestLines = stats.pairs.hardest.map((p) => `- ${p.a} × ${p.b}: ${p.score}`).join("\n");
 
@@ -262,9 +389,6 @@ function buildUserPrompt(stats, lang) {
 ## 특성별 분포 (0~100, 45~55는 중간)
 ${traitLines}
 
-## 참가자별 두드러진 특성
-${memberLines}
-
 ## 조합 궁합 (규칙 기반 계산값, 평균 ${stats.pairs.average})
 결이 잘 맞는 조합
 ${bestLines}
@@ -274,7 +398,7 @@ ${hardestLines}
 
 ## 요청
 위 분포를 근거로, 이 사람들이 반 활동이나 모임을 진행할 때 어떻게 운영하면 좋을지 짧게 조언하라.
-조 편성 제안에는 위에 나온 ${stats.participantCount}명을 빠짐없이, 중복 없이 배치한다.
+조 편성은 별도로 계산되니 언급하지 않는다.
 각 항목은 한 문장, 개수는 스키마 설명에 적힌 그대로 지킨다. 서술을 늘리지 않는다.`;
 }
 
@@ -310,13 +434,15 @@ async function callBedrock(payload) {
 
       const isTimeout = e.name === "TimeoutError" || e.name === "AbortError";
       const status = e.$metadata && e.$metadata.httpStatusCode;
-      // 스로틀링·타임아웃·5xx만 재시도한다. 권한·검증 오류는 다시 보내도 같은 결과다.
+      // 타임아웃은 재시도하지 않는다. LLM_TIMEOUT_MS(25초)를 다 쓴 뒤 재시도로 25초를
+      // 또 기다리면 게이트웨이 타임아웃(약 29초)을 무조건 넘긴다 (실측으로 재현됨).
+      // 스로틀링·5xx만 재시도 대상으로 둔다. 권한·검증 오류는 다시 보내도 같은 결과다.
       const retryable =
-        isTimeout ||
-        e.name === "ThrottlingException" ||
-        e.name === "ServiceUnavailableException" ||
-        e.name === "ModelTimeoutException" ||
-        (status && status >= 500);
+        !isTimeout &&
+        (e.name === "ThrottlingException" ||
+          e.name === "ServiceUnavailableException" ||
+          e.name === "ModelTimeoutException" ||
+          (status && status >= 500));
 
       if (!retryable || attempt === MAX_ATTEMPTS) {
         const err = new Error(`Bedrock ${e.name || "Error"}: ${e.message}`);
@@ -330,9 +456,14 @@ async function callBedrock(payload) {
 async function generateAdvice(stats, lang) {
   // 스키마·프롬프트를 최소로 줄인 이유: 게이트웨이 타임아웃(약 29초) 안에 들어오려면
   // 출력 토큰을 줄이는 게 유일한 레버다. thinking off보다 adaptive+저효율이 실측상 더 빨랐다.
+  //
+  // max_tokens는 thinking(추론)이 쓴 토큰까지 합산된 상한이다. 실제 답변(JSON)은
+  // 700토큰 안팎으로 작지만, adaptive thinking이 가끔 예상보다 길게 추론하면 max_tokens를
+  // 다 써버려서 답변 텍스트를 한 글자도 못 쓰고 잘릴 수 있다 (실측으로 재현됨).
+  // 그래서 실제 필요량보다 넉넉하게 잡는다.
   const response = await callBedrock({
     anthropic_version: BEDROCK_ANTHROPIC_VERSION,
-    max_tokens: 2000,
+    max_tokens: 4000,
     system: SYSTEM_PROMPT,
     thinking: { type: "adaptive" },
     output_config: {
@@ -352,8 +483,9 @@ async function generateAdvice(stats, lang) {
   // json_schema를 줘도 응답은 text 블록에 담겨 온다. 직접 찾아서 파싱한다.
   const textBlock = response.content.find((block) => block.type === "text");
   if (!textBlock) {
-    const err = new Error("모델 응답에 텍스트가 없습니다.");
-    err.code = "EMPTY";
+    // stop_reason === "max_tokens"면 thinking만 하다 잘린 것. 원인 구분을 위해 남긴다.
+    const err = new Error(`모델 응답에 텍스트가 없습니다 (stop_reason=${response.stop_reason}).`);
+    err.code = response.stop_reason === "max_tokens" ? "TRUNCATED" : "EMPTY";
     throw err;
   }
 
@@ -371,6 +503,8 @@ async function generateAdvice(stats, lang) {
 // ────────────────────────────────────────────────────────────
 
 // 참가자 구성·점수·언어·프롬프트 버전이 모두 같을 때만 캐시를 재사용한다.
+// groupSize는 일부러 넣지 않는다 — 조 편성은 LLM 결과와 무관하게 매 요청마다 새로 계산하므로,
+// 조 크기만 바꿨다고 캐시를 무효화하고 LLM을 다시 부를 이유가 없다.
 function buildSignature(participants, lang) {
   const payload = JSON.stringify({
     v: PROMPT_VERSION,
@@ -396,6 +530,16 @@ exports.handler = async (event) => {
     /* noop */
   }
   const lang = body.lang === "ja" ? "ja" : "ko";
+  const groupSize = normalizeGroupSize(body.groupSize);
+
+  // 개발자 전용: SEED_SECRET이 설정돼 있고 요청의 seedSecret이 일치하면, 이 방을 가짜
+  // 참가자로 채우고 마감까지 처리한 뒤 아래로 그대로 이어간다 (조언 생성까지 한 번에 확인 가능).
+  const seedSecret = getSeedSecret();
+  if (seedSecret && body.seedSecret === seedSecret) {
+    const count = Number.isInteger(body.seedCount) && body.seedCount > 0 ? body.seedCount : SEED_PARTICIPANT_COUNT;
+    await seedFakeRoom(code, count);
+    console.log(`[seed] ROOM#${code}에 가짜 참가자 ${count}명 생성 + 마감 처리 완료`);
+  }
 
   const room = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `ROOM#${code}`, SK: "META" } }));
   if (!room.Item) return respond(404, { error: "존재하지 않는 방 코드입니다." });
@@ -431,14 +575,18 @@ exports.handler = async (event) => {
   const cached = (queryResult.Items || []).find((item) => item.SK === "ADVICE");
   if (cached && cached.signature === signature) {
     if (cached.status === "ready") {
+      // 조 편성은 캐시에 저장된 걸 쓰지 않고 매번 다시 계산한다 — 조 크기를 바꿔도
+      // LLM을 다시 부를 필요 없이 즉시 반영되게 하기 위함.
+      const liveAdvice = { ...cached.advice, grouping: buildGrouping(participants, lang, groupSize) };
       return respond(200, {
         status: "ready",
         cached: true,
         lang: cached.lang,
+        groupSize,
         generatedAt: cached.generatedAt,
         participantCount: participants.length,
         stats,
-        advice: cached.advice,
+        advice: liveAdvice,
       });
     }
     if (cached.status === "generating" && now - cached.claimedAt < CLAIM_STALE_SECONDS) {
@@ -473,10 +621,11 @@ exports.handler = async (event) => {
     return respond(500, { error: "조언 생성을 시작하지 못했습니다." });
   }
 
-  // 3) LLM 호출
+  // 3) LLM 호출 + 규칙 기반 조 편성 병합
   let advice;
   try {
     advice = await generateAdvice(stats, lang);
+    advice.grouping = buildGrouping(participants, lang, groupSize);
   } catch (e) {
     console.error("advice generation failed:", e.code || e.name, e.message);
     // 선점 표시를 지워서 다음 요청이 바로 다시 시도할 수 있게 한다.
@@ -514,6 +663,7 @@ exports.handler = async (event) => {
     status: "ready",
     cached: false,
     lang,
+    groupSize,
     generatedAt,
     participantCount: participants.length,
     stats,
