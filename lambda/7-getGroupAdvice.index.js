@@ -3,18 +3,32 @@
 // 트리거: API Gateway HTTP API - POST /rooms/{code}/advice
 //
 // 환경변수
-//   TABLE_NAME        = (DynamoDB 테이블 이름)
-//   ANTHROPIC_API_KEY = (Anthropic API 키)  ※ 리포지토리의 .env는 배포된 Lambda에 반영되지 않는다.
-//                        반드시 Lambda 함수의 "환경 변수"에 직접 등록할 것.
+//   TABLE_NAME = (DynamoDB 테이블 이름)
+//   (ANTHROPIC_API_KEY 불필요 — Bedrock은 Lambda 실행 역할의 IAM 권한으로 인증한다)
+//
+// 이 함수의 실행 역할(Execution role)에 아래 인라인 정책이 필요하다:
+//   {
+//     "Effect": "Allow",
+//     "Action": "bedrock:InvokeModel",
+//     "Resource": "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6"
+//   }
+//   (cross-region inference profile을 쓰므로 Resource를 특정 리전으로 좁히지 않는다)
 //
 // 의존성 없음. 1~6번과 똑같이 이 파일 하나만 콘솔에 붙여넣으면 된다.
-//   @aws-sdk/*  → Lambda 런타임에 기본 포함
-//   Anthropic   → SDK 대신 런타임 내장 fetch로 직접 호출한다 (Node.js 18 이상 런타임 필요)
+//   @aws-sdk/client-bedrock-runtime → Lambda 런타임에 기본 포함 (다른 @aws-sdk/* 클라이언트와 동일)
 //
 // Timeout: 60초 권장 (LLM 호출 포함).
 // ⚠️ API Gateway HTTP API의 통합 타임아웃은 약 29초로 고정이다.
 //    아래 LLM_TIMEOUT_MS(25초)는 게이트웨이보다 먼저 포기하도록 맞춰둔 값이다.
 //    그래도 초과가 잦으면 202 + 폴링 방식으로 바꾼다 (프런트가 이미 3~5초 폴링을 한다).
+//
+// 모델: Claude Sonnet 4.6 (Bedrock 레거시 InvokeModel 엔드포인트).
+//   Sonnet 5는 이 계정에서 아직 Bedrock 접근이 열리지 않아 4.6으로 낮췄다.
+//   이 엔드포인트는 direct API처럼 output_config.format(구조화 출력)을 그대로 지원하므로
+//   tool_choice 강제 우회가 필요 없다.
+//   서울 리전(ap-northeast-2)은 on-demand throughput이 없어 "global." cross-region
+//   inference profile 접두사가 필요하다 — 접두사 없이 호출하면
+//   "on-demand throughput isn't supported" 400 에러가 난다.
 
 const crypto = require("crypto");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
@@ -25,38 +39,22 @@ const {
   PutCommand,
   DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
+const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client, { marshallOptions: { removeUndefinedValues: true } });
 const TABLE_NAME = process.env.TABLE_NAME;
 
 const ROOM_TTL_SECONDS = 60 * 60 * 24 * 2; // 48시간 (다른 항목과 동일)
-const MODEL = "claude-sonnet-5";
-const PROMPT_VERSION = "v3"; // 프롬프트/스키마를 고치면 올린다. 캐시가 자동으로 무효화된다.
+const MODEL = "claude-sonnet-4-6";
+const PROMPT_VERSION = "v5"; // Sonnet 4.6 + 구조화 출력으로 전환 — 이전 캐시와 형식이 달라 버전을 올린다.
 const CLAIM_STALE_SECONDS = 120; // 생성 중 표시가 이 시간을 넘기면 죽은 것으로 보고 다시 시도
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_VERSION = "2023-06-01";
+const BEDROCK_MODEL_ID = "global.anthropic.claude-sonnet-4-6";
+const BEDROCK_ANTHROPIC_VERSION = "bedrock-2023-05-31";
 const LLM_TIMEOUT_MS = 25_000;
 
-// 콘솔에서 값을 붙여넣을 때 앞뒤 공백·개행·따옴표가 섞이면 401이 난다.
-// 원인을 찾기 어려운 실수라 여기서 정리하고 쓴다.
-function getApiKey() {
-  const raw = process.env.ANTHROPIC_API_KEY || "";
-  return raw.trim().replace(/^["']|["']$/g, "");
-}
-
-// OpenAI 키(sk-proj-…)를 잘못 넣으면 원인이 "API key is invalid" 뿐이라 찾기 어렵다.
-// 막지는 않고(접두사 규칙이 바뀔 수 있으므로) 로그로만 알린다.
-function warnIfNotAnthropicKey() {
-  const key = getApiKey();
-  if (key && !key.startsWith("sk-ant-")) {
-    console.error(
-      `ANTHROPIC_API_KEY가 Anthropic 키 형식이 아닙니다 (접두사 "${key.slice(0, 7)}"). ` +
-        'Anthropic 키는 "sk-ant-"로 시작합니다. OpenAI 키(sk-proj-…)를 넣지 않았는지 확인하세요.',
-    );
-  }
-}
+const bedrock = new BedrockRuntimeClient({});
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -241,10 +239,7 @@ const ADVICE_SCHEMA = {
 };
 
 function buildUserPrompt(stats, lang) {
-  const langLine =
-    lang === "ja"
-      ? "すべての出力テキストは日本語で書くこと。"
-      : "모든 출력 텍스트는 한국어로 작성한다.";
+  const langLine = lang === "ja" ? "すべての出力テキストは日本語で書くこと。" : "모든 출력 텍스트는 한국어로 작성한다.";
 
   const traitLines = stats.traits
     .map(
@@ -254,9 +249,7 @@ function buildUserPrompt(stats, lang) {
     )
     .join("\n");
 
-  const memberLines = stats.members
-    .map((m) => `- ${m.codename}: 두드러진 특성 ${m.topTraits.join(", ")}`)
-    .join("\n");
+  const memberLines = stats.members.map((m) => `- ${m.codename}: 두드러진 특성 ${m.topTraits.join(", ")}`).join("\n");
 
   const bestLines = stats.pairs.best.map((p) => `- ${p.a} × ${p.b}: ${p.score}`).join("\n");
   const hardestLines = stats.pairs.hardest.map((p) => `- ${p.a} × ${p.b}: ${p.score}`).join("\n");
@@ -289,60 +282,47 @@ ${hardestLines}
 // LLM 호출
 // ────────────────────────────────────────────────────────────
 
-// Anthropic Messages API 직접 호출. SDK를 쓰지 않으므로 재시도·타임아웃을 직접 다룬다.
-async function callAnthropic(payload) {
+// Bedrock InvokeModel 호출. SDK가 서명·재시도 일부를 처리하지만, 429/5xx 재시도와
+// 타임아웃(AbortSignal)은 API Gateway 통합 타임아웃(약 29초)에 맞춰 직접 다룬다.
+async function callBedrock(payload) {
   const MAX_ATTEMPTS = 2;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    let res;
     try {
-      res = await fetch(ANTHROPIC_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": getApiKey(),
-          "anthropic-version": ANTHROPIC_VERSION,
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-      });
+      const res = await bedrock.send(
+        new InvokeModelCommand({
+          modelId: BEDROCK_MODEL_ID,
+          contentType: "application/json",
+          accept: "application/json",
+          body: JSON.stringify(payload),
+        }),
+        { abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) },
+      );
+      return JSON.parse(Buffer.from(res.body).toString("utf-8"));
     } catch (e) {
-      // 네트워크 오류·타임아웃. 마지막 시도였으면 그대로 올린다.
-      if (attempt === MAX_ATTEMPTS) {
-        const err = new Error(`Anthropic 요청 실패: ${e.name}`);
-        err.code = "NETWORK";
+      // 권한 문제는 재시도해도 같은 결과다. 원인을 바로 알 수 있게 로그를 남긴다.
+      if (e.name === "AccessDeniedException") {
+        console.error(
+          "Bedrock 권한 없음 → 이 Lambda의 실행 역할(Execution role)에 " +
+            `bedrock:InvokeModel 권한이 있는지 확인하세요 (모델: ${BEDROCK_MODEL_ID}).`,
+        );
+      }
+
+      const isTimeout = e.name === "TimeoutError" || e.name === "AbortError";
+      const status = e.$metadata && e.$metadata.httpStatusCode;
+      // 스로틀링·타임아웃·5xx만 재시도한다. 권한·검증 오류는 다시 보내도 같은 결과다.
+      const retryable =
+        isTimeout ||
+        e.name === "ThrottlingException" ||
+        e.name === "ServiceUnavailableException" ||
+        e.name === "ModelTimeoutException" ||
+        (status && status >= 500);
+
+      if (!retryable || attempt === MAX_ATTEMPTS) {
+        const err = new Error(`Bedrock ${e.name || "Error"}: ${e.message}`);
+        err.code = isTimeout ? "TIMEOUT" : e.name || "UNKNOWN";
         throw err;
       }
-      continue;
-    }
-
-    if (res.ok) return res.json();
-
-    const detail = await res.text().catch(() => "");
-
-    // 401은 원인이 거의 항상 "환경변수에 들어간 값"이다.
-    // 키 자체는 찍지 않고, 로컬 키와 대조할 수 있는 지문만 남긴다.
-    if (res.status === 401) {
-      const raw = process.env.ANTHROPIC_API_KEY || "";
-      const key = getApiKey();
-      console.error(
-        "ANTHROPIC_API_KEY 진단 →",
-        JSON.stringify({
-          rawLength: raw.length,
-          trimmedLength: key.length,
-          prefix: key.slice(0, 7),
-          hadSurroundingJunk: raw !== key,
-          fingerprint: crypto.createHash("sha256").update(key).digest("hex").slice(0, 12),
-        }),
-      );
-    }
-
-    // 429/5xx만 재시도한다. 400·401은 다시 보내도 같은 결과다.
-    const retryable = res.status === 429 || res.status >= 500;
-    if (!retryable || attempt === MAX_ATTEMPTS) {
-      const err = new Error(`Anthropic ${res.status}: ${detail.slice(0, 300)}`);
-      err.code = "HTTP_" + res.status;
-      throw err;
     }
   }
 }
@@ -350,8 +330,8 @@ async function callAnthropic(payload) {
 async function generateAdvice(stats, lang) {
   // 스키마·프롬프트를 최소로 줄인 이유: 게이트웨이 타임아웃(약 29초) 안에 들어오려면
   // 출력 토큰을 줄이는 게 유일한 레버다. thinking off보다 adaptive+저효율이 실측상 더 빨랐다.
-  const response = await callAnthropic({
-    model: MODEL,
+  const response = await callBedrock({
+    anthropic_version: BEDROCK_ANTHROPIC_VERSION,
     max_tokens: 2000,
     system: SYSTEM_PROMPT,
     thinking: { type: "adaptive" },
@@ -406,12 +386,6 @@ function buildSignature(participants, lang) {
 // ────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
-  if (!getApiKey()) {
-    console.error("ANTHROPIC_API_KEY 환경변수가 없습니다.");
-    return respond(500, { error: "AI 조언 기능이 설정되지 않았습니다." });
-  }
-  warnIfNotAnthropicKey();
-
   const code = event.pathParameters && event.pathParameters.code;
   if (!code) return respond(400, { error: "code가 필요합니다." });
 
@@ -487,8 +461,7 @@ exports.handler = async (event) => {
           claimedAt: now,
           ttl: now + ROOM_TTL_SECONDS,
         },
-        ConditionExpression:
-          "attribute_not_exists(SK) OR signature <> :sig OR claimedAt < :stale",
+        ConditionExpression: "attribute_not_exists(SK) OR signature <> :sig OR claimedAt < :stale",
         ExpressionAttributeValues: { ":sig": signature, ":stale": now - CLAIM_STALE_SECONDS },
       }),
     );

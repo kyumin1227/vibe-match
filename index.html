@@ -249,6 +249,16 @@
         background: var(--brass);
       }
 
+      .type-image {
+        display: block;
+        width: 140px;
+        height: 140px;
+        object-fit: cover;
+        margin: 0 auto 14px auto;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        background: rgba(243, 239, 227, 0.04);
+      }
       .type-code {
         display: block;
         width: fit-content;
@@ -675,14 +685,7 @@
       <div id="screen-result" class="hidden">
         <div class="eyebrow" id="t-eyebrow-result"></div>
         <div class="card">
-          <div class="compass">
-            <svg viewBox="0 0 120 120" width="100" height="100" fill="none">
-              <circle cx="60" cy="60" r="56" stroke="#D4A94C" stroke-opacity="0.35" stroke-width="1" />
-              <circle cx="60" cy="60" r="38" stroke="#D4A94C" stroke-opacity="0.5" stroke-width="1" />
-              <polygon points="60,20 66,60 60,100 54,60" fill="#D4A94C" />
-              <circle cx="60" cy="60" r="5" fill="#F3EFE3" />
-            </svg>
-          </div>
+          <img class="type-image" id="result-type-image" alt="" />
           <div class="type-code" id="result-code"></div>
           <div class="result-title" id="result-title"></div>
           <div class="result-sub" id="result-sub"></div>
@@ -1546,6 +1549,11 @@
         });
 
         const archetype = computeArchetype(scores, lang);
+        const typeImage = document.getElementById("result-type-image");
+        typeImage.onerror = () => typeImage.classList.add("hidden");
+        typeImage.classList.remove("hidden");
+        typeImage.alt = archetype.title;
+        typeImage.src = `/images/${archetype.code}.png`;
         document.getElementById("result-code").textContent = "TYPE · " + archetype.code;
         document.getElementById("result-title").textContent = archetype.emoji + " " + archetype.title;
         document.getElementById("result-sub").textContent =
